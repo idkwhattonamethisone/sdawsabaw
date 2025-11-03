@@ -1,9 +1,15 @@
 // Initialize variables
-let products = [];
-let filteredProducts = [];
+let products = []; // Current page of products from API
+let allCategories = []; // All available categories (fetched once)
+let filteredProducts = []; // For display (same as products when using API pagination)
 let currentPage = 1;
 const productsPerPage = 12;
 let currentMode = 'drag'; // 'drag' or 'multi'
+let totalProducts = 0; // Total count from API for pagination
+let currentFilters = { category: 'all', sortBy: 'all', minPrice: 0, maxPrice: Infinity, searchQuery: '' };
+let productCache = new Map(); // Cache products by page number and filter key
+let loadedPages = new Set(); // Track which pages have been loaded
+let maxLoadedPage = 0; // Highest page number loaded so far
 
 // Utility function to format prices in PHP currency with comma separators
 function formatPHPPrice(price) {
@@ -52,125 +58,20 @@ function hideLoadingProducts() {
 const urlParams = new URLSearchParams(window.location.search);
 const searchQuery = urlParams.get('search');
 
-// Load products from MongoDB
-async function loadProducts() {
-    
-    // Show loading animations
-    showLoadingProducts();
-    showLoadingProductCount();
-    
-    try {
-        const response = await fetch('http://localhost:3000/api/products');
-        if (!response.ok) {
-            throw new Error('Failed to fetch products');
-        }
-        products = await response.json();
-        
-        // Get unique categories for filter dropdown
-        const uniqueCategories = [...new Set(products.map(p => p.category))];
-        
-        // Convert price to number - prefer SellingPrice, but fall back gracefully
-        const toNumber = (val) => {
-            if (val === null || val === undefined) return NaN;
-            if (typeof val === 'object' && val.$numberDecimal !== undefined) return parseFloat(val.$numberDecimal);
-            return parseFloat(val);
-        };
-        products = products.map(product => {
-            const candidates = [product.SellingPrice, product.sellingPrice, product.Price, product.price];
-            let finalPrice = NaN;
-            for (const c of candidates) {
-                const n = toNumber(c);
-                if (!isNaN(n)) { finalPrice = n; break; }
-            }
-            const convertedProduct = { ...product, price: finalPrice };
-            return convertedProduct;
-        });
-        
-        filteredProducts = [...products];
-        
-        // If there's a search query, filter products immediately
-        if (searchQuery) {
-            const searchInput = document.querySelector('.header-search input');
-            if (searchInput) {
-                searchInput.value = searchQuery;
-            } else {
-                console.error('Search input element not found!');
-            }
-            filterAndSortProducts();
-        } else {
-            displayProducts();
-        }
-        updateProductCount();
-    } catch (error) {
-        console.error('Error loading products:', error);
-        showToast('Failed to load products', 'error');
-    }
+// Generate cache key from filters
+function getCacheKey(category, sortBy, searchQuery) {
+    return `${category}_${sortBy}_${searchQuery || ''}`;
 }
 
-// Update product count in sidebar
-function updateProductCount() {
-    document.getElementById('productCount').textContent = filteredProducts.length;
-}
-
-// Get URL parameters
-function getUrlParameter(name) {
-    name = name.replace(/[\[]/, '\\[').replace(/[\]]/, '\\]');
-    var regex = new RegExp('[\\?&]' + name + '=([^&#]*)');
-    var results = regex.exec(location.search);
-    return results === null ? '' : decodeURIComponent(results[1].replace(/\+/g, ' '));
-}
-
-// Filter and sort products
-function filterAndSortProducts(selectedCategory = null) {
-    // Show brief loading for better UX
-    window.showLoadingProducts && showLoadingProducts();
+// Load a single page from API
+async function fetchPageFromAPI(page, category, sortBy, searchQuery) {
+    const skip = (page - 1) * productsPerPage;
+    let apiUrl = `http://localhost:3000/api/products?limit=${productsPerPage}&skip=${skip}&includeMeta=true`;
     
-    // Add small delay to show loading animation
-    setTimeout(() => {
-        const searchInput = document.querySelector('.header-search input');
-        const minPriceInput = document.getElementById('minPrice');
-        const maxPriceInput = document.getElementById('maxPrice');
-        
-        const searchQuery = searchInput ? searchInput.value.toLowerCase().trim() : '';
-        // Get category from parameter or active sidebar link
-        const category = selectedCategory || document.querySelector('.category-link.active')?.dataset.category || 'all';
-        const minPrice = minPriceInput ? parseFloat(minPriceInput.value) || 0 : 0;
-        const maxPrice = maxPriceInput ? parseFloat(maxPriceInput.value) || Infinity : Infinity;
-        const sortBy = document.getElementById('sort-by').value;
-        
-        if (products.length === 0) {
-            console.error('No products available to filter!');
-            return;
-        }
-        
-        // First filter the products
-        const normalizeCategory = (raw) => {
-            const val = String(raw || '').toLowerCase();
-            const includesAny = (list) => list.some(k => val.includes(k));
-            if (includesAny(['paint', 'painting'])) return 'paints';
-            if (includesAny(['power-tools','powertools','hand-tools','handtools','tool','tools','accessor'])) return 'tools-accessories';
-            if (includesAny(['building-materials','aggregate','cement','sand','gravel','hollow','plywood','wood','lumber','tile','roof'])) return 'building-materials-aggregates';
-            if (includesAny(['electrical','wire','breaker','outlet','switch'])) return 'electrical-supplies';
-            if (includesAny(['plumbing','fixture','pipe','fitting','faucet','valve'])) return 'plumbing-fixtures';
-            if (includesAny(['fastener','screw','nail','bolt','nut','consumable','adhesive','sealant','tape'])) return 'fasteners-consumables';
-            switch (String(raw || '')) {
-                case 'Power-Tools':
-                case 'Hand-Tools':
-                    return 'tools-accessories';
-                case 'Building-Materials':
-                    return 'building-materials-aggregates';
-                case 'Plumbing':
-                    return 'plumbing-fixtures';
-                case 'Electrical':
-                    return 'electrical-supplies';
-                default:
-                    return 'other';
-            }
-        };
-
-        const normalizeRequested = (slug) => {
-            switch (slug) {
-                case 'all': return 'all';
+    // Add category filter if not 'all'
+    if (category && category !== 'all') {
+        const normalizeCategory = (cat) => {
+            switch(cat) {
                 case 'power-tools':
                 case 'hand-tools':
                     return 'tools-accessories';
@@ -181,54 +82,270 @@ function filterAndSortProducts(selectedCategory = null) {
                 case 'electrical':
                     return 'electrical-supplies';
                 default:
-                    return slug || 'all';
+                    return cat;
             }
         };
-
-        const requestedBucket = normalizeRequested(category);
-
-        filteredProducts = products.filter(product => {
-            const matchesSearch = !searchQuery || 
-                (product.name && product.name.toLowerCase().includes(searchQuery));
-            
-            const productBucket = normalizeCategory(product.category);
-            const categoryMatches = requestedBucket === 'all' ? true : (requestedBucket === productBucket);
-            
-            const matchesPrice = product.price >= minPrice && product.price <= maxPrice;
-            
-            return matchesSearch && categoryMatches && matchesPrice;
-        });
-        
-        // Then sort the filtered products
-        switch(sortBy) {
-            case 'price-low':
-                filteredProducts.sort((a, b) => a.price - b.price);
-                break;
-            case 'price-high':
-                filteredProducts.sort((a, b) => b.price - a.price);
-                break;
-            case 'name':
-                filteredProducts.sort((a, b) => a.name.localeCompare(b.name));
-                break;
-            case 'all':
-            default:
-                // Keep original order
-                break;
+        apiUrl += `&category=${encodeURIComponent(normalizeCategory(category))}`;
+    }
+    
+    // Add sort parameter
+    if (sortBy && sortBy !== 'all') {
+        apiUrl += `&sortBy=${sortBy}`;
+    }
+    
+    const response = await fetch(apiUrl);
+    if (!response.ok) {
+        throw new Error('Failed to fetch products');
+    }
+    
+    const data = await response.json();
+    let pageProducts = [];
+    let pageTotalCount = 0;
+    
+    // Handle both formats: array (backward compat) or object with metadata
+    if (Array.isArray(data)) {
+        pageProducts = data;
+        pageTotalCount = data.length;
+    } else {
+        pageProducts = data.products || [];
+        pageTotalCount = data.totalCount || 0;
+    }
+    
+    // Convert price to number
+    const toNumber = (val) => {
+        if (val === null || val === undefined) return NaN;
+        if (typeof val === 'object' && val.$numberDecimal !== undefined) return parseFloat(val.$numberDecimal);
+        return parseFloat(val);
+    };
+    
+    pageProducts = pageProducts.map(product => {
+        const candidates = [product.SellingPrice, product.sellingPrice, product.Price, product.price];
+        let finalPrice = NaN;
+        for (const c of candidates) {
+            const n = toNumber(c);
+            if (!isNaN(n)) { finalPrice = n; break; }
         }
-        
-        // Reset pagination window when filters change
-        paginationStart = 1;
-        currentPage = 1;
-        displayProducts(filteredProducts);
-        updateProductCount();
-    }, 500);
+        return { ...product, price: finalPrice };
+    });
+    
+    return { products: pageProducts, totalCount: pageTotalCount };
 }
 
-// Display products in the grid
+// Load products with pagination and filters from API (with progressive preloading)
+async function loadProducts(page = 1, category = 'all', sortBy = 'all', searchQuery = '') {
+    // Check if this is a filter change (different cache key)
+    const cacheKey = getCacheKey(category, sortBy, searchQuery);
+    const isFilterChange = cacheKey !== getCacheKey(
+        currentFilters.category, 
+        currentFilters.sortBy, 
+        currentFilters.searchQuery
+    );
+    
+    // If filters changed, clear cache and reset loaded pages
+    if (isFilterChange) {
+        productCache.clear();
+        loadedPages.clear();
+        maxLoadedPage = 0;
+    }
+    
+    // Check cache first
+    const cacheKeyForPage = `${cacheKey}_page_${page}`;
+    if (productCache.has(cacheKeyForPage)) {
+        const cached = productCache.get(cacheKeyForPage);
+        products = cached.products;
+        if (cached.totalCount) totalProducts = cached.totalCount;
+        loadedPages.add(page);
+        if (page > maxLoadedPage) maxLoadedPage = page;
+        
+        // Apply client-side filters and display
+        applyClientSideFilters();
+        currentPage = page;
+        currentFilters = { category, sortBy, searchQuery };
+        displayProducts();
+        updateProductCount();
+        updatePagination();
+        
+        // Trigger preloading if needed
+        triggerPreloading(page, category, sortBy, searchQuery);
+        return;
+    }
+    
+    // Show loading animations only for user-initiated page changes
+    if (page === currentPage + 1 || page === currentPage - 1 || page === 1) {
+        showLoadingProducts();
+        showLoadingProductCount();
+    }
+    
+    try {
+        // Fetch the requested page
+        const { products: pageProducts, totalCount } = await fetchPageFromAPI(page, category, sortBy, searchQuery);
+        
+        products = pageProducts;
+        totalProducts = totalCount;
+        
+        // Cache the result
+        productCache.set(cacheKeyForPage, { products: pageProducts, totalCount });
+        loadedPages.add(page);
+        if (page > maxLoadedPage) maxLoadedPage = page;
+        
+        // Apply client-side filters
+        applyClientSideFilters();
+        
+        // Update current page and filters
+        currentPage = page;
+        currentFilters = { category, sortBy, searchQuery };
+        
+        // Display products
+        displayProducts();
+        updateProductCount();
+        updatePagination();
+        hideLoadingProducts();
+        
+        // Trigger preloading if needed
+        triggerPreloading(page, category, sortBy, searchQuery);
+        
+        // Initial load: preload pages 2 and 3 if loading page 1
+        if (page === 1 && !isFilterChange) {
+            preloadPages([2, 3], category, sortBy, searchQuery);
+        }
+    } catch (error) {
+        console.error('Error loading products:', error);
+        showToast('Failed to load products', 'error');
+        hideLoadingProducts();
+    }
+}
+
+// Apply client-side filters (search and price range)
+function applyClientSideFilters() {
+    filteredProducts = [...products];
+    
+    // Apply price range filter
+    const minPriceInput = document.getElementById('minPrice');
+    const maxPriceInput = document.getElementById('maxPrice');
+    if (minPriceInput || maxPriceInput) {
+        const minPrice = minPriceInput ? parseFloat(minPriceInput.value) || 0 : 0;
+        const maxPrice = maxPriceInput ? parseFloat(maxPriceInput.value) || Infinity : Infinity;
+        if (minPrice > 0 || maxPrice < Infinity) {
+            filteredProducts = filteredProducts.filter(product => 
+                !isNaN(product.price) && product.price >= minPrice && product.price <= maxPrice
+            );
+        }
+    }
+    
+    // Apply search filter if provided
+    const searchInput = document.querySelector('.header-search input');
+    const searchQuery = searchInput ? searchInput.value.trim() : '';
+    if (searchQuery) {
+        filteredProducts = filteredProducts.filter(product => 
+            product.name && product.name.toLowerCase().includes(searchQuery.toLowerCase())
+        );
+    }
+}
+
+// Check if we need to preload more pages
+function triggerPreloading(currentPageNum, category, sortBy, searchQuery) {
+    const cacheKey = getCacheKey(category, sortBy, searchQuery);
+    const totalPages = Math.ceil(totalProducts / productsPerPage);
+    
+    // If we're on page 3 or any page that's 2 away from maxLoadedPage, load 2 more pages
+    if (currentPageNum >= maxLoadedPage - 1 && maxLoadedPage < totalPages) {
+        const pagesToLoad = [];
+        const pagesNeeded = Math.min(2, totalPages - maxLoadedPage);
+        
+        for (let i = 1; i <= pagesNeeded; i++) {
+            const pageToLoad = maxLoadedPage + i;
+            const cacheKeyForPage = `${cacheKey}_page_${pageToLoad}`;
+            if (!productCache.has(cacheKeyForPage) && pageToLoad <= totalPages) {
+                pagesToLoad.push(pageToLoad);
+            }
+        }
+        
+        if (pagesToLoad.length > 0) {
+            preloadPages(pagesToLoad, category, sortBy, searchQuery);
+        }
+    }
+}
+
+// Preload multiple pages in the background
+async function preloadPages(pages, category, sortBy, searchQuery) {
+    // Load pages in parallel
+    const loadPromises = pages.map(page => 
+        fetchPageFromAPI(page, category, sortBy, searchQuery)
+            .then(({ products: pageProducts, totalCount }) => {
+                const cacheKey = getCacheKey(category, sortBy, searchQuery);
+                const cacheKeyForPage = `${cacheKey}_page_${page}`;
+                
+                // Only cache if not already cached (race condition protection)
+                if (!productCache.has(cacheKeyForPage)) {
+                    productCache.set(cacheKeyForPage, { products: pageProducts, totalCount });
+                    loadedPages.add(page);
+                    if (page > maxLoadedPage) maxLoadedPage = page;
+                }
+            })
+            .catch(error => {
+                console.error(`Error preloading page ${page}:`, error);
+            })
+    );
+    
+    // Don't await - let it load in background
+    Promise.all(loadPromises).then(() => {
+        console.log(`Preloaded pages: ${pages.join(', ')}`);
+    });
+}
+
+// Load all categories once (for filter dropdown)
+async function loadCategories() {
+    try {
+        // Fetch a small sample to get categories, or use a dedicated endpoint
+        const response = await fetch('http://localhost:3000/api/products?limit=1000');
+        if (response.ok) {
+            const allProducts = await response.json();
+            allCategories = [...new Set(allProducts.map(p => p.category).filter(c => c))];
+        }
+    } catch (error) {
+        console.error('Error loading categories:', error);
+    }
+}
+
+// Update product count in sidebar
+function updateProductCount() {
+    // Use totalProducts from API when using pagination
+    const countElement = document.getElementById('productCount');
+    if (countElement) {
+        countElement.textContent = totalProducts > 0 ? totalProducts : filteredProducts.length;
+    }
+}
+
+// Get URL parameters
+function getUrlParameter(name) {
+    name = name.replace(/[\[]/, '\\[').replace(/[\]]/, '\\]');
+    var regex = new RegExp('[\\?&]' + name + '=([^&#]*)');
+    var results = regex.exec(location.search);
+    return results === null ? '' : decodeURIComponent(results[1].replace(/\+/g, ' '));
+}
+
+// Filter and sort products - reloads from API with new filters
+function filterAndSortProducts(selectedCategory = null) {
+    const searchInput = document.querySelector('.header-search input');
+    const sortBySelect = document.getElementById('sort-by');
+    
+    // Get category from parameter or active sidebar link
+    const category = selectedCategory || document.querySelector('.category-link.active')?.dataset.category || 'all';
+    const searchQuery = searchInput ? searchInput.value.trim() : '';
+    const sortBy = sortBySelect ? sortBySelect.value : 'all';
+    
+    // Reset to first page when filters change
+    paginationStart = 1;
+    currentPage = 1;
+    
+    // Reload products from API with new filters
+    loadProducts(currentPage, category, sortBy, searchQuery);
+}
+
+// Display products in the grid (products are already paginated from API)
 function displayProducts(productsToDisplay = filteredProducts) {
-    const start = (currentPage - 1) * productsPerPage;
-    const end = start + productsPerPage;
-    const displayedProducts = productsToDisplay.slice(start, end);
+    // Products are already paginated from API, no need to slice
+    const displayedProducts = productsToDisplay;
     
     // Add cart wiggle animation when products are first displayed
     if (displayedProducts.length > 0) {
@@ -374,7 +491,8 @@ function handleDragEnd(e) {
 
 // Update pagination controls
 function updatePagination() {
-    const totalPages = Math.ceil(filteredProducts.length / productsPerPage);
+    // Use totalProducts from API for pagination
+    const totalPages = Math.ceil((totalProducts || filteredProducts.length) / productsPerPage);
     const pagination = document.getElementById('pagination');
     if (!pagination) return;
     pagination.innerHTML = '';
@@ -395,11 +513,19 @@ function updatePagination() {
         btn.textContent = label;
         if (isActive) btn.className = 'active';
         btn.onclick = () => {
-            currentPage = page;
+            // Get current filters
+            const sortBySelect = document.getElementById('sort-by');
+            const sortBy = sortBySelect ? sortBySelect.value : 'all';
+            const category = document.querySelector('.category-link.active')?.dataset.category || 'all';
+            const searchInput = document.querySelector('.header-search input');
+            const searchQuery = searchInput ? searchInput.value.trim() : '';
+            
             // Shift window if the chosen page is outside current window
             const desiredStart = Math.floor((page - 1) / windowSize) * windowSize + 1;
             if (desiredStart !== paginationStart) paginationStart = desiredStart;
-            displayProducts();
+            
+            // Load products for the new page
+            loadProducts(page, category, sortBy, searchQuery);
         };
         return btn;
     };
@@ -411,7 +537,7 @@ function updatePagination() {
         backEllipsis.textContent = '…';
         backEllipsis.onclick = () => {
             paginationStart = Math.max(1, paginationStart - windowSize);
-            displayProducts();
+            updatePagination(); // Refresh pagination UI
         };
         pagination.appendChild(backEllipsis);
     }
@@ -427,7 +553,7 @@ function updatePagination() {
         fwdEllipsis.textContent = '…';
         fwdEllipsis.onclick = () => {
             paginationStart = windowEnd + 1;
-            displayProducts();
+            updatePagination(); // Refresh pagination UI
         };
         pagination.appendChild(fwdEllipsis);
 
@@ -479,7 +605,7 @@ function updateTopLoginBtn() {
         if (currentUser && currentUser.fullName) {
             topLoginBtn.textContent = currentUser.fullName;
             if (userDropdown) userDropdown.style.display = 'none';
-        } else if (currentUser && currentUser.email && currentUser.email.endsWith('@gmail.com')) {
+        } else if (currentUser && currentUser.email) {
             const username = currentUser.email.split('@')[0];
             topLoginBtn.textContent = username;
             if (userDropdown) userDropdown.style.display = 'none';
@@ -490,18 +616,41 @@ function updateTopLoginBtn() {
     }
 }
 
+// Shop page uses API pagination - no need to pre-fetch all products
+// Products will be loaded on demand with pagination when DOMContentLoaded fires
+
 // Initialize the page
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
     // Only run shop functionality on shop pages
     if (!window.location.pathname.includes('shop.html')) {
         return;
     }
     
+    // Get initial category from URL if present
+    const urlCategory = getUrlParameter('category');
+    const initialCategory = urlCategory || 'all';
+    
+    // Load categories for filter dropdown
+    await loadCategories();
+    
+    // Load initial page of products with pagination
+    const sortBySelect = document.getElementById('sort-by');
+    const initialSortBy = sortBySelect ? sortBySelect.value : 'all';
+    
+    // Load products with API pagination
+    await loadProducts(1, initialCategory, initialSortBy, searchQuery || '');
+    
+    // Set active category link if URL category exists
+    if (urlCategory) {
+        const categoryLink = document.querySelector(`.category-link[data-category="${urlCategory}"]`);
+        if (categoryLink) {
+            categoryLink.classList.add('active');
+        }
+    }
+    
     // Update cart count and login state
     Auth.updateCartCount();
     updateTopLoginBtn();
-    
-    loadProducts();
 
     // Set up event listeners with null checks
     const sortByElement = document.getElementById('sort-by');
@@ -525,7 +674,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (searchForm) {
         searchForm.addEventListener('submit', (e) => {
             e.preventDefault(); // Prevent form submission
-            currentPage = 1; // Reset to first page when searching
+            // Page reset is handled in filterAndSortProducts
             filterAndSortProducts();
         });
 
@@ -535,7 +684,7 @@ document.addEventListener('DOMContentLoaded', () => {
             searchInput.addEventListener('keypress', (e) => {
                 if (e.key === 'Enter') {
                     e.preventDefault(); // Prevent form submission
-                    currentPage = 1; // Reset to first page when searching
+                    // Page reset is handled in filterAndSortProducts
                     filterAndSortProducts();
                 }
             });
@@ -548,7 +697,6 @@ document.addEventListener('DOMContentLoaded', () => {
             e.preventDefault();
             document.querySelectorAll('.category-filter .category-link').forEach(l => l.classList.remove('active'));
             this.classList.add('active');
-            currentPage = 1;
             filterAndSortProducts(this.dataset.category);
         });
     });
@@ -557,7 +705,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const priceFilter = document.querySelector('.price-filter');
     if (priceFilter) {
         priceFilter.addEventListener('change', () => {
-            currentPage = 1;
             filterAndSortProducts();
         });
     }
@@ -599,36 +746,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // Check for category parameter in URL and set appropriate category
-    const urlCategory = getUrlParameter('category');
-    let initialCategory = 'all';
-    
-    if (urlCategory) {
-        const legacyToNew = {
-            'power-tools': 'tools-accessories',
-            'hand-tools': 'tools-accessories',
-            'building-materials': 'building-materials-aggregates',
-            'plumbing': 'plumbing-fixtures',
-            'electrical': 'electrical-supplies'
-        };
-        const newValid = ['all','paints','tools-accessories','building-materials-aggregates','electrical-supplies','plumbing-fixtures','fasteners-consumables','other'];
-        const mapped = legacyToNew[urlCategory] || urlCategory;
-        if (newValid.includes(mapped)) initialCategory = mapped;
-    }
-    
-    // Set the active category link based on URL parameter or default to 'all'
-    document.querySelectorAll('.category-link').forEach(link => link.classList.remove('active'));
-    const activeLink = document.querySelector(`.category-link[data-category="${initialCategory}"]`);
-    if (activeLink) {
-        activeLink.classList.add('active');
-    } else {
-        // Fallback to 'all' if the category link is not found
-        document.querySelector('.category-link[data-category="all"]').classList.add('active');
-        initialCategory = 'all';
-    }
-    
-    window.currentSidebarCategory = initialCategory;
-    filterAndSortProducts(initialCategory);
+    // Category handling is already done above in initialization section
 
     // Setup mode toggle functionality
     setupModeToggle();
@@ -661,12 +779,8 @@ function resetFilters() {
     document.querySelector('.category-link[data-category="all"]').classList.add('active');
     window.currentSidebarCategory = 'all';
     
-    // Reset filtered products to all products
-    filteredProducts = [...products];
-    
-    // Update display
-    currentPage = 1;
-    displayProducts();
+    // Reset filters and reload from API
+    filterAndSortProducts();
     updateProductCount();
     
     // Clear URL search parameters
@@ -701,3 +815,4 @@ function switchMode(mode) {
 // Multi-mode actions removed - drag and drop only
 
 // Multi-mode cart functions removed - drag and drop only
+

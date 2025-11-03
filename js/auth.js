@@ -507,6 +507,11 @@ class Auth {
             updateAccountButton();
         }
         
+        // Update top login button text
+        if (typeof updateTopLoginBtn === 'function') {
+            updateTopLoginBtn();
+        }
+        
         // Update cart count
         this.updateCartCount();
         
@@ -751,10 +756,7 @@ function updateAccountButton() {
         if (currentUser) {
             // Logged in state - show username instead of full name
             const displayName = currentUser.username || currentUser.fullName;
-            newBtn.innerHTML = `
-                <span class="profile-icon">👤</span>
-                ${displayName}
-            `;
+            newBtn.textContent = displayName;
             newBtn.onclick = () => {
                 if (currentUser.isStaff) {
                     window.location.href = 'staff-dashboard.html';
@@ -772,27 +774,13 @@ function updateAccountButton() {
             }
     } else {
         // Logged out state
-        newBtn.innerHTML = `
-            <span class="profile-icon">👤</span>
-            Log In
-        `;
+        newBtn.textContent = 'Log In';
         newBtn.onclick = () => {
             document.getElementById('loginModal').classList.add('show');
         };
         if (cartBtn) {
             cartBtn.classList.remove('hidden'); // Show cart for guest users
         }
-    }
-
-    // Add hover event listeners
-    const profileIcon = newBtn.querySelector('.profile-icon');
-    if (profileIcon) {
-        newBtn.addEventListener('mouseenter', () => {
-            profileIcon.textContent = '👥';
-        });
-        newBtn.addEventListener('mouseleave', () => {
-            profileIcon.textContent = '👤';
-        });
     }
 }
 

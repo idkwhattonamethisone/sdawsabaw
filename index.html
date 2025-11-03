@@ -159,28 +159,7 @@
         window.addEventListener('load', function(){ setTimeout(runBrandAnimation, 50); }, { once: true });
       })();
     </script>
-    <script>
-        // Show a first-load spinner overlay for the index page
-        (function() {
-            if (window.LoadingUtils) {
-                var shownAt = Date.now();
-                window.LoadingUtils.show('LOADING');
-                var onLoadHide = function(){
-                    var elapsed = Date.now() - shownAt;
-                    var remaining = Math.max(0, 200 - elapsed);
-                    setTimeout(function(){ window.LoadingUtils.hide(); }, remaining);
-                };
-                if (document.readyState === 'complete') onLoadHide();
-                else window.addEventListener('load', onLoadHide);
-            } else {
-                // Fallback if LoadingUtils not yet defined
-                window.addEventListener('load', function(){
-                    var overlay = document.getElementById('loadingOverlay');
-                    if (overlay) overlay.classList.remove('show');
-                });
-            }
-        })();
-    </script>
+    
     <script src="js/shop.js"></script>
     <script src="js/stockDisplay.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/2.0.2/anime.min.js"></script>
@@ -1211,6 +1190,24 @@
             throw new Error('Redirecting to staff dashboard');
         }
 
+        // CRITICAL: Start API call IMMEDIATELY, before DOMContentLoaded
+        // This ensures products API call begins as soon as script loads
+        // For index page, we only need limited products for featured section and category carousel
+        // Featured: 5 products, Categories: ~7 categories × 4 products = 28 products
+        // Fetch ~60 products to ensure enough after stock filtering
+        const INDEX_PRODUCTS_LIMIT = 60;
+        
+        // Create a separate limited promise for index page display
+        // headerSearch.js will still use window.productsPromise for full search functionality
+        // Use limit parameter in API call to reduce network transfer
+        const indexProductsPromise = fetch(`http://localhost:3000/api/products?limit=${INDEX_PRODUCTS_LIMIT}`).then(response => {
+            if (!response.ok) throw new Error('Failed to fetch products');
+            return response.json();
+        }).catch(error => {
+            console.error('Error fetching products:', error);
+            return [];
+        });
+
         // Initialize on page load
         document.addEventListener('DOMContentLoaded', async () => {
             try {
@@ -1245,13 +1242,9 @@
                         });
                     }
                 }
-
-                // Fetch products from database
-                const response = await fetch('http://localhost:3000/api/products');
-                if (!response.ok) {
-                    throw new Error('Failed to fetch products');
-                }
-                let products = await response.json();
+                
+                // Wait for limited products (already started above)
+                let products = await indexProductsPromise;
                 
                 // Get unique categories from database
                 const uniqueCategories = [...new Set(products.map(p => p.category))];

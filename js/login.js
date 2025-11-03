@@ -192,7 +192,8 @@ document.addEventListener('DOMContentLoaded', () => {
             if (currentUser && currentUser.fullName) {
                 topLoginBtn.textContent = currentUser.fullName;
                 if (userDropdown) userDropdown.style.display = 'none';
-            } else if (currentUser && currentUser.email && currentUser.email.endsWith('@gmail.com')) {
+            } else if (currentUser && currentUser.email) {
+                // For any email, use the email username part
                 const username = currentUser.email.split('@')[0];
                 topLoginBtn.textContent = username;
                 if (userDropdown) userDropdown.style.display = 'none';
@@ -202,6 +203,10 @@ document.addEventListener('DOMContentLoaded', () => {
             if (userDropdown) userDropdown.style.display = 'none';
         }
     }
+    
+    // Make updateTopLoginBtn globally accessible
+    window.updateTopLoginBtn = updateTopLoginBtn;
+    
     updateTopLoginBtn();
 
     // Set up cart button click handler
@@ -1103,7 +1108,22 @@ document.addEventListener('DOMContentLoaded', () => {
                     // Store auth token
                     localStorage.setItem('auth_token', result.token);
 
+                    // Set current user in Auth system first
+                    if (Auth && typeof Auth.setCurrentUser === 'function') {
+                        Auth.setCurrentUser(result.user);
+                    }
+
                     showToast(`Login successful! Welcome back, ${result.user.fullName || result.user.email}!`, 'success');
+            
+                    // Update UI after login (including button text)
+                    if (Auth && typeof Auth.updateUIAfterLogin === 'function') {
+                        Auth.updateUIAfterLogin();
+                    }
+                    
+                    // Also manually update top login button to ensure it updates immediately
+                    if (typeof updateTopLoginBtn === 'function') {
+                        updateTopLoginBtn();
+                    }
             
             // Close login modal
                     window.closeAllModals();
@@ -1116,10 +1136,24 @@ document.addEventListener('DOMContentLoaded', () => {
             setTimeout(() => {
                         if (result.user.isStaff) {
                             window.location.href = 'staff-dashboard.html';
+                            if (window.LoadingUtils) window.LoadingUtils.hide();
                     } else {
-                            // Check if address modal should be shown
-                            if (typeof showAddressModal === 'function') {
-                                showAddressModal(true);
+                            // Verify user is actually logged in before checking addresses
+                            const currentUser = Auth.getCurrentUser();
+                            if (currentUser && !currentUser.isStaff) {
+                                // Check if address modal should be shown (only if user has no addresses)
+                                if (typeof hasAddresses === 'function' && typeof showAddressModal === 'function') {
+                                    const userHasAddresses = hasAddresses();
+                                    
+                                    // Only show address modal if user doesn't have addresses
+                                    if (!userHasAddresses) {
+                                        showAddressModal(true);
+                                    }
+                                    if (window.LoadingUtils) window.LoadingUtils.hide();
+                                } else {
+                                    if (window.LoadingUtils) window.LoadingUtils.hide();
+                                }
+                            } else {
                                 if (window.LoadingUtils) window.LoadingUtils.hide();
                             }
                         }

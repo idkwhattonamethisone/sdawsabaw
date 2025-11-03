@@ -43,7 +43,7 @@ async function connectToDatabase() {
 }
 
 // MongoDB connection string
-const uri = "mongodb+srv://24uglyandrew:weaklings162@sanricosite.vgnc0qj.mongodb.net/";
+const uri = "mongodb+srv://24uglyandrew:weaklings162@sanricofree.tesbmqx.mongodb.net/";
 const client = new MongoClient(uri);
 
 // Connect to MongoDB
@@ -73,13 +73,94 @@ async function connectToMongo() {
     }
 }
 
-// API endpoint to get all products
+// API endpoint to get all products (with optional limit, pagination, and category filter)
 app.get('/api/products', async (req, res) => {
     try {
         const database = client.db("MyProductsDb");
         const collection = database.collection("Products");
-        const products = await collection.find({ isActive: true }).toArray();
-        res.json(products);
+        
+        // Build query filter
+        let queryFilter = { isActive: true };
+        
+        // Category filter support
+        if (req.query.category && req.query.category !== 'all') {
+            // Support normalized category buckets
+            const categoryMap = {
+                'paints': { $regex: /paint|painting/i },
+                'tools-accessories': { $regex: /power-tools|powertools|hand-tools|handtools|tool|tools|accessor/i },
+                'building-materials-aggregates': { $regex: /building-materials|aggregate|cement|sand|gravel|hollow|plywood|wood|lumber|tile|roof/i },
+                'electrical-supplies': { $regex: /electrical|wire|breaker|outlet|switch/i },
+                'plumbing-fixtures': { $regex: /plumbing|fixture|pipe|fitting|faucet|valve/i },
+                'fasteners-consumables': { $regex: /fastener|screw|nail|bolt|nut|consumable|adhesive|sealant|tape/i }
+            };
+            
+            // Check if it's a normalized category
+            if (categoryMap[req.query.category]) {
+                queryFilter.category = categoryMap[req.query.category];
+            } else {
+                // Direct category match (case insensitive)
+                queryFilter.category = { $regex: new RegExp(`^${req.query.category}$`, 'i') };
+            }
+        }
+        
+        // Price range filter - will be handled after fetching since price might be in different fields
+        // We'll handle this in the application layer for now
+        
+        // Build query
+        let query = collection.find(queryFilter);
+        
+        // Sorting - we need to handle price sorting differently since it can be in different fields
+        // For now, fetch all and sort client-side, or use aggregation pipeline
+        // Let's use a simpler approach: sort by name first, price will be handled client-side if needed
+        if (req.query.sortBy) {
+            switch(req.query.sortBy) {
+                case 'price-low':
+                    // Try to sort by common price fields - MongoDB will use first available
+                    query = query.sort({ 'SellingPrice': 1 });
+                    // If that doesn't exist, we'll handle in aggregation or client-side
+                    break;
+                case 'price-high':
+                    query = query.sort({ 'SellingPrice': -1 });
+                    break;
+                case 'name':
+                    query = query.sort({ name: 1 });
+                    break;
+            }
+        } else {
+            // Default: sort by name for consistent ordering
+            query = query.sort({ name: 1 });
+        }
+        
+        // Get total count before pagination (for pagination info)
+        const totalCount = await collection.countDocuments(queryFilter);
+        
+        // Pagination support
+        if (req.query.skip) {
+            const skip = parseInt(req.query.skip);
+            if (skip > 0) {
+                query = query.skip(skip);
+            }
+        }
+        
+        // Limit support
+        const limit = req.query.limit ? parseInt(req.query.limit) : null;
+        if (limit && limit > 0) {
+            query = query.limit(limit);
+        }
+        
+        const products = await query.toArray();
+        
+        // Return products with pagination metadata
+        if (req.query.includeMeta === 'true') {
+            res.json({
+                products: products,
+                totalCount: totalCount,
+                currentPage: req.query.skip ? Math.floor(parseInt(req.query.skip) / (limit || totalCount)) + 1 : 1,
+                totalPages: limit ? Math.ceil(totalCount / limit) : 1
+            });
+        } else {
+            res.json(products);
+        }
     } catch (error) {
         console.error("Error fetching products:", error);
         res.status(500).json({ error: "Failed to fetch products" });
@@ -1204,27 +1285,58 @@ app.post('/api/staff/login', async (req, res) => {
 // API endpoint to save a user address
 app.post('/api/user-addresses', async (req, res) => {
     try {
-        const { userId, addressData } = req.body;
-        if (!userId || !addressData) {
-            return res.status(400).json({ error: 'Missing userId or addressData' });
+        const { userId, email, addressData } = req.body;
+        if (!addressData) {
+            return res.status(400).json({ error: 'Missing addressData' });
         }
+        if (!userId && !email) {
+            return res.status(400).json({ error: 'Missing userId or email' });
+        }
+        
         const database = client.db('MyProductsDb');
         const collection = database.collection('UserAddresses');
+
+        // Build query for finding existing addresses to unset default
+        const userQuery = {};
+        if (userId) {
+            // Convert userId to number if possible
+            if (!isNaN(userId)) {
+                userQuery.userId = Number(userId);
+            } else {
+                userQuery.userId = userId;
+            }
+        }
+        if (email) {
+            userQuery.email = email;
+        }
 
         // If this address is set as default, unset all others for this user
         if (addressData.isDefault) {
             await collection.updateMany(
-                { userId, isDefault: true },
+                { ...userQuery, isDefault: true },
                 { $set: { isDefault: false } }
             );
         }
 
+        // Build document - include userId if provided, email if provided
         const doc = {
-            userId,
             ...addressData,
             createdAt: new Date(),
             updatedAt: new Date()
         };
+        
+        if (userId) {
+            // Convert userId to number if possible
+            if (!isNaN(userId)) {
+                doc.userId = Number(userId);
+            } else {
+                doc.userId = userId;
+            }
+        }
+        if (email) {
+            doc.email = email;
+        }
+        
         const result = await collection.insertOne(doc);
         res.json({ success: true, message: 'Address saved successfully', addressId: result.insertedId });
     } catch (error) {
@@ -1236,16 +1348,31 @@ app.post('/api/user-addresses', async (req, res) => {
 // API endpoint to get user addresses by userId
 app.get('/api/user-addresses', async (req, res) => {
     try {
-        let { userId } = req.query;
-        if (!userId) {
-            return res.status(400).json({ error: 'Missing userId' });
+        let { userId, email } = req.query;
+        
+        // Support both userId and email lookup
+        if (!userId && !email) {
+            return res.status(400).json({ error: 'Missing userId or email' });
         }
-        // Convert userId to number if possible
-        if (!isNaN(userId)) userId = Number(userId);
-
+        
         const database = client.db('MyProductsDb');
         const collection = database.collection('UserAddresses');
-        const addresses = await collection.find({ userId }).sort({ createdAt: -1 }).toArray();
+        
+        // Build query - support both userId and email
+        const query = {};
+        if (userId) {
+            // Convert userId to number if possible
+            if (!isNaN(userId)) {
+                query.userId = Number(userId);
+            } else {
+                query.userId = userId;
+            }
+        }
+        if (email) {
+            query.email = email;
+        }
+        
+        const addresses = await collection.find(query).sort({ createdAt: -1 }).toArray();
         res.json(addresses);
     } catch (error) {
         console.error('Error fetching user addresses:', error);
@@ -1564,30 +1691,7 @@ app.get('/api/orders/walkin/stats', async (req, res) => {
     }
 });
 
-// API endpoint to get user addresses (for order address resolution)
-app.get('/api/user-addresses', async (req, res) => {
-    try {
-        const { userId } = req.query;
-        
-        if (!userId) {
-            return res.status(400).json({ error: "User ID is required" });
-        }
-        
-        console.log('📮 Fetching addresses for user:', userId);
-        
-        const database = client.db("MyProductsDb");
-        const collection = database.collection("UserAddresses");
-        
-        const addresses = await collection.find({ userId: userId }).toArray();
-        
-        
-        res.json(addresses);
-        
-    } catch (error) {
-        console.error("❌ Error fetching user addresses:", error);
-        res.status(500).json({ error: "Failed to fetch user addresses" });
-    }
-});
+// NOTE: Duplicate endpoint removed - using the one at line 1318 that supports both userId and email
 
 // API endpoint for comprehensive staff dashboard statistics
 app.get('/api/orders/stats/comprehensive', async (req, res) => {

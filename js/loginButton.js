@@ -24,27 +24,10 @@ class LoginButton {
         newBtn.className = 'account-btn';
         newBtn.href = '#';
 
-        // Create profile icon span
-        const profileIcon = document.createElement('span');
-        profileIcon.className = 'profile-icon';
-        profileIcon.textContent = '👤';
-
-        // Create text span
-        const textSpan = document.createElement('span');
-        textSpan.className = 'login-text';
-
-        // Add hover events - these should work on all pages
-        newBtn.addEventListener('mouseenter', () => {
-            profileIcon.textContent = '👥';
-        });
-        newBtn.addEventListener('mouseleave', () => {
-            profileIcon.textContent = '👤';
-        });
-
         // Check login state
         const currentUser = Auth.getCurrentUser();
         if (currentUser) {
-            textSpan.textContent = currentUser.fullName;
+            newBtn.textContent = currentUser.fullName || currentUser.email?.split('@')[0] || 'My Account';
             newBtn.onclick = () => {
                 if (currentUser.isStaff) {
                     window.location.href = 'staff-dashboard.html';
@@ -53,7 +36,7 @@ class LoginButton {
                 }
             };
         } else {
-            textSpan.textContent = 'Log In';
+            newBtn.textContent = 'Log In';
             newBtn.onclick = () => {
                 const loginModal = document.getElementById('loginModal');
                 if (loginModal) {
@@ -61,10 +44,6 @@ class LoginButton {
                 }
             };
         }
-
-        // Assemble button
-        newBtn.appendChild(profileIcon);
-        newBtn.appendChild(textSpan);
 
         // Replace old button
         this.button.parentNode.replaceChild(newBtn, this.button);

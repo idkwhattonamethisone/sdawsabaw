@@ -22,6 +22,8 @@ class Navigation {
     }
 
     applyPreloadStyles() {
+        // Transition page loader disabled
+        return;
         try {
             // Allow opt-out or excluded pages
             const pathname = (location.pathname || '').toLowerCase();
@@ -63,6 +65,11 @@ class Navigation {
     }
 
     setupPageLoader() {
+        // Transition page loader disabled; ensure any residual classes are cleaned up
+        try { document.documentElement.classList.remove('preloading'); } catch(e) {}
+        try { document.body && document.body.classList.remove('preloading'); } catch(e) {}
+        try { window.LoadingUtils && window.LoadingUtils.hide && window.LoadingUtils.hide(); } catch(e) {}
+        return;
         // Cleanup helper to ensure any early overlays/classes are removed
         const cleanupLoader = () => {
             try { document.documentElement.classList.remove('preloading'); } catch(e) {}

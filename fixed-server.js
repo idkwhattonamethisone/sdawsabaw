@@ -11,7 +11,7 @@ app.use(express.json());
 app.use(express.static('.'));
 
 // MongoDB connection - using the WORKING connection pattern
-const uri = "mongodb+srv://24uglyandrew:weaklings162@sanricosite.vgnc0qj.mongodb.net/";
+const uri = "mongodb+srv://24uglyandrew:weaklings162@sanricofree.tesbmqx.mongodb.net/";
 
 console.log("🚀 Starting server with working MongoDB connection...");
 

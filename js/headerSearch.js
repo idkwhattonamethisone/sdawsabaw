@@ -5,28 +5,22 @@ function formatPHPPrice(price) {
     }).format(price);
 }
 
-// Handle header search functionality
-document.addEventListener('DOMContentLoaded', () => {
-    const headerSearchForm = document.querySelector('.header-search');
-    let searchTimeout;
-    let searchDropdown;
-    let products = [];
-    
-    // Load products from API
-    async function loadProducts() {
-        try {
-            const response = await fetch('http://localhost:3000/api/products');
-            if (!response.ok) {
-                throw new Error('Failed to fetch products');
-            }
-            products = await response.json();
+// CRITICAL: Start API call IMMEDIATELY when script loads, before DOMContentLoaded
+// Share the products promise with other scripts to avoid duplicate fetches
+(function startProductsFetch() {
+    // Only create promise if it doesn't already exist (to avoid duplicate fetches)
+    if (!window.productsPromise) {
+        window.productsPromise = fetch('http://localhost:3000/api/products').then(response => {
+            if (!response.ok) throw new Error('Failed to fetch products');
+            return response.json();
+        }).then(products => {
             // Convert price to number - prefer SellingPrice, but fall back gracefully
             const toNumber = (val) => {
                 if (val === null || val === undefined) return NaN;
                 if (typeof val === 'object' && val.$numberDecimal !== undefined) return parseFloat(val.$numberDecimal);
                 return parseFloat(val);
             };
-            products = products.map(product => {
+            return products.map(product => {
                 const candidates = [product.SellingPrice, product.sellingPrice, product.Price, product.price];
                 let finalPrice = NaN;
                 for (const c of candidates) {
@@ -35,6 +29,48 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 return { ...product, price: finalPrice };
             });
+        }).catch(error => {
+            console.error('Error fetching products:', error);
+            return [];
+        });
+    }
+})();
+
+// Handle header search functionality
+document.addEventListener('DOMContentLoaded', () => {
+    const headerSearchForm = document.querySelector('.header-search');
+    let searchTimeout;
+    let searchDropdown;
+    let products = [];
+    
+    // Load products from API (use shared promise if available)
+    async function loadProducts() {
+        try {
+            // Use shared promise if available, otherwise fetch separately
+            if (window.productsPromise) {
+                products = await window.productsPromise;
+            } else {
+                const response = await fetch('http://localhost:3000/api/products');
+                if (!response.ok) {
+                    throw new Error('Failed to fetch products');
+                }
+                products = await response.json();
+                // Convert price to number - prefer SellingPrice, but fall back gracefully
+                const toNumber = (val) => {
+                    if (val === null || val === undefined) return NaN;
+                    if (typeof val === 'object' && val.$numberDecimal !== undefined) return parseFloat(val.$numberDecimal);
+                    return parseFloat(val);
+                };
+                products = products.map(product => {
+                    const candidates = [product.SellingPrice, product.sellingPrice, product.Price, product.price];
+                    let finalPrice = NaN;
+                    for (const c of candidates) {
+                        const n = toNumber(c);
+                        if (!isNaN(n)) { finalPrice = n; break; }
+                }
+                    return { ...product, price: finalPrice };
+                });
+            }
         } catch (error) {
             console.error('Error loading products:', error);
         }

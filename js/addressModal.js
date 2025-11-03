@@ -309,8 +309,30 @@ class AddressModalManager {
     }
 
     // Show the modal
-    show(isPostLogin = false) {
+    async show(isPostLogin = false) {
         console.log('AddressModal.show() called with isPostLogin:', isPostLogin);
+        
+        // Safety check: Ensure user is logged in before showing modal
+        if (isPostLogin) {
+            const currentUser = Auth.getCurrentUser();
+            if (!currentUser || !currentUser.id) {
+                console.log('User not logged in, skipping address modal');
+                return; // Don't show modal if user is not logged in
+            }
+            
+            // Check if user already has addresses (skip if they do)
+            try {
+                const hasAddresses = await this.userHasAddressesAsync();
+                if (hasAddresses) {
+                    console.log('User already has addresses, skipping modal display');
+                    return; // Don't show modal if user already has addresses
+                }
+            } catch (error) {
+                console.error('Error checking addresses:', error);
+                // If check fails, still show modal to allow user to add address
+            }
+        }
+        
         this.init();
         const modal = document.getElementById('addressModal');
         const title = document.getElementById('modalTitle');
@@ -324,11 +346,6 @@ class AddressModalManager {
         
         if (isPostLogin) {
             title.textContent = 'Add Your First Address';
-            // Check if user already has addresses (skip if they do)
-            if (this.userHasAddresses()) {
-                console.log('User already has addresses, skipping modal display');
-                return; // Don't show modal if user already has addresses
-            }
         } else {
             title.textContent = 'Add Address';
         }
@@ -375,15 +392,39 @@ class AddressModalManager {
         e.preventDefault();
         
         const submitBtn = document.getElementById('saveAddressBtn');
+        if (!submitBtn) {
+            console.error('Save button not found');
+            return;
+        }
+        
         const btnText = submitBtn.querySelector('.btn-text');
-        const originalText = btnText.textContent;
+        const originalText = btnText ? btnText.textContent : submitBtn.textContent.replace(/\s*Saving\.\.\.\s*/, '').trim() || 'Save Address';
+        
+        // Show loading state immediately - use requestAnimationFrame to ensure DOM update
+        submitBtn.disabled = true;
+        
+        if (btnText) {
+            btnText.innerHTML = '<span class="loading-spinner"></span>Saving...';
+        } else {
+            // Fallback: use button directly if .btn-text doesn't exist
+            submitBtn.innerHTML = '<span class="loading-spinner"></span>Saving...';
+        }
+        
+        // Force a repaint to ensure spinner is visible before validation
+        await new Promise(resolve => {
+            requestAnimationFrame(() => {
+                requestAnimationFrame(resolve);
+            });
+        });
+        
+        console.log('Button state updated - disabled:', submitBtn.disabled, 'HTML:', submitBtn.innerHTML);
         
         try {
-            // Show loading state
-            submitBtn.disabled = true;
-            btnText.innerHTML = '<span class="loading-spinner"></span>Saving...';
-            
             const currentUser = Auth.getCurrentUser();
+            if (!currentUser) {
+                throw new Error('You must be logged in to save an address');
+            }
+            
             const addressData = {
                 id: this.generateId(),
                 label: document.getElementById('addressLabel').value.trim(),
@@ -399,7 +440,7 @@ class AddressModalManager {
             };
             console.log('DEBUG: addressData to save:', addressData);
 
-            // Validate required fields using SecurityValidator
+            // Validate required fields
             const requiredFields = ['label', 'streetAddress', 'barangay', 'city', 'postalCode', 'province'];
             for (const field of requiredFields) {
                 if (!addressData[field]) {
@@ -407,41 +448,76 @@ class AddressModalManager {
                 }
             }
 
-            // Enhanced validation using SecurityValidator
-            const labelValidation = SecurityValidator.validateFullName(addressData.label);
-            if (!labelValidation.valid) {
-                throw new Error(labelValidation.message);
+            // Enhanced validation using basic validation rules
+            // Validate label (should not be empty and reasonable length)
+            if (addressData.label.length < 2 || addressData.label.length > 50) {
+                throw new Error('Address label must be between 2 and 50 characters');
             }
 
-            const streetValidation = SecurityValidator.validateSearchQuery(addressData.streetAddress);
-            if (!streetValidation.valid) {
-                throw new Error('Invalid street address format');
+            // Validate street address (should not be empty and reasonable length)
+            if (addressData.streetAddress.length < 5 || addressData.streetAddress.length > 200) {
+                throw new Error('Street address must be between 5 and 200 characters');
             }
 
-            const barangayValidation = SecurityValidator.validateSearchQuery(addressData.barangay);
-            if (!barangayValidation.valid) {
-                throw new Error('Invalid barangay format');
+            // Validate barangay (should not be empty and reasonable length)
+            if (addressData.barangay.length < 2 || addressData.barangay.length > 100) {
+                throw new Error('Barangay must be between 2 and 100 characters');
             }
 
-            const cityValidation = SecurityValidator.validateSearchQuery(addressData.city);
-            if (!cityValidation.valid) {
-                throw new Error('Invalid city format');
+            // Validate city (should not be empty and reasonable length)
+            if (addressData.city.length < 2 || addressData.city.length > 100) {
+                throw new Error('City must be between 2 and 100 characters');
             }
 
-            const provinceValidation = SecurityValidator.validateSearchQuery(addressData.province);
-            if (!provinceValidation.valid) {
-                throw new Error('Invalid province format');
+            // Validate province (should not be empty and reasonable length)
+            if (addressData.province.length < 2 || addressData.province.length > 100) {
+                throw new Error('Province must be between 2 and 100 characters');
             }
 
-            const postalCodeValidation = SecurityValidator.validatePostalCode(addressData.postalCode);
-            if (!postalCodeValidation.valid) {
-                throw new Error(postalCodeValidation.message);
+            // Validate postal code (4 digits)
+            if (!/^\d{4}$/.test(addressData.postalCode)) {
+                throw new Error('Postal code must be exactly 4 digits');
             }
 
             // Save address
             await this.saveAddress(addressData);
             
-            showToast('Address added successfully!', 'success');
+            // Refresh the addresses cache after saving
+            // This ensures hasAddresses() will work correctly
+            if (currentUser && currentUser.email) {
+                const apiBaseUrl = 'http://localhost:3000';
+                window.addressesPromise = fetch(`${apiBaseUrl}/api/user-addresses?email=${encodeURIComponent(currentUser.email)}`)
+                    .then(response => {
+                        if (!response.ok) throw new Error('Failed to fetch addresses');
+                        return response.json();
+                    })
+                    .then(addresses => {
+                        return Array.isArray(addresses) ? addresses.map(addr => ({
+                            ...addr,
+                            id: addr.id || addr._id
+                        })) : [];
+                    })
+                    .catch(error => {
+                        console.error('Error refreshing addresses:', error);
+                        return [];
+                    });
+            }
+            
+            // Show success toast and close after brief delay to show spinner worked
+            await new Promise(resolve => setTimeout(resolve, 300));
+            
+            if (typeof showToast === 'function') {
+                showToast('Address added successfully!', 'success');
+            } else {
+                // Fallback: manually show success toast
+                const toast = document.getElementById('toast');
+                if (toast) {
+                    toast.textContent = 'Address added successfully!';
+                    toast.className = 'toast success show';
+                    setTimeout(() => toast.classList.remove('show'), 3000);
+                }
+            }
+            
             this.close();
             
             // Call callback if provided
@@ -451,11 +527,54 @@ class AddressModalManager {
             
         } catch (error) {
             console.error('Error saving address:', error);
-            showToast(error.message || 'Failed to save address', 'error');
+            console.log('showToast available:', typeof showToast);
+            
+            // Keep spinner visible briefly so user can see something happened
+            await new Promise(resolve => setTimeout(resolve, 300));
+            
+            // Show error toast - try multiple methods
+            const errorMessage = error.message || 'Failed to save address. Please check your input and try again.';
+            
+            // First try the global showToast function
+            if (typeof showToast === 'function') {
+                try {
+                    showToast(errorMessage, 'error');
+                    console.log('Toast shown via showToast function');
+                } catch (toastError) {
+                    console.error('Error calling showToast:', toastError);
+                }
+            }
+            
+            // Fallback: manually show toast
+            const toast = document.getElementById('toast');
+            if (toast) {
+                try {
+                    toast.textContent = errorMessage;
+                    toast.className = 'toast error show';
+                    setTimeout(() => {
+                        toast.classList.remove('show');
+                    }, 3000);
+                    console.log('Toast shown manually');
+                } catch (toastError) {
+                    console.error('Error showing toast manually:', toastError);
+                    alert(errorMessage);
+                }
+            } else {
+                console.warn('Toast element not found, using alert');
+                alert(errorMessage);
+            }
         } finally {
-            // Reset button state
-            submitBtn.disabled = false;
-            btnText.textContent = originalText;
+            // Reset button state after a brief delay to ensure user sees the feedback
+            setTimeout(() => {
+                submitBtn.disabled = false;
+                if (btnText) {
+                    btnText.textContent = originalText;
+                    btnText.innerHTML = originalText; // Reset innerHTML in case it was changed
+                } else {
+                    submitBtn.textContent = originalText;
+                    submitBtn.innerHTML = originalText;
+                }
+            }, 500);
         }
     }
 
@@ -471,10 +590,22 @@ class AddressModalManager {
             // Use the backend server URL for API requests
             const apiBaseUrl = 'http://localhost:3000'; // Change this if your backend runs elsewhere
             console.log('DEBUG: Sending fetch to ' + apiBaseUrl + '/api/user-addresses');
+            
+            // Build request body - prefer email, fallback to userId
+            const requestBody = {
+                addressData
+            };
+            if (currentUser.email) {
+                requestBody.email = currentUser.email;
+            }
+            if (currentUser.id) {
+                requestBody.userId = currentUser.id;
+            }
+            
             const response = await fetch(apiBaseUrl + '/api/user-addresses', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ userId: currentUser.id, addressData })
+                body: JSON.stringify(requestBody)
             });
             const result = await response.json();
             console.log('DEBUG: Response from ' + apiBaseUrl + '/api/user-addresses:', result);
@@ -487,15 +618,35 @@ class AddressModalManager {
         }
     }
 
-    // Check if user has addresses
+    // Check if user has addresses (async version that fetches from API using email)
+    async userHasAddressesAsync() {
+        try {
+            const currentUser = Auth.getCurrentUser();
+            if (!currentUser || !currentUser.email) return false;
+            
+            const apiBaseUrl = 'http://localhost:3000';
+            const response = await fetch(`${apiBaseUrl}/api/user-addresses?email=${encodeURIComponent(currentUser.email)}`);
+            if (!response.ok) return false;
+            
+            const addresses = await response.json();
+            return Array.isArray(addresses) && addresses.length > 0;
+        } catch (error) {
+            console.error('Error checking addresses:', error);
+            return false;
+        }
+    }
+
+    // Check if user has addresses (sync version - checks cache, but async check is preferred)
     userHasAddresses() {
         try {
             const currentUser = Auth.getCurrentUser();
-            if (!currentUser) return false;
+            if (!currentUser || !currentUser.id) return false;
             
-            const stored = localStorage.getItem(`user_addresses_${currentUser.id}`);
-            const userAddresses = stored ? JSON.parse(stored) : [];
-            return userAddresses.length > 0;
+            // Try to use cached result from addressesPromise if available
+            // Note: This returns a promise, but the function should be used with async/await
+            // For backward compatibility, we check if the promise resolves synchronously
+            // which it won't, so this is mainly for checking the cache
+            return false; // Always return false for sync check, use userHasAddressesAsync() instead
         } catch (error) {
             return false;
         }

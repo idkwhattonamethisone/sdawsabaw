@@ -510,6 +510,34 @@ html, body {
   transition: border-color 0.3s ease;
 }
 
+/* Enhanced dropdown/select styling - more prominent, not pale */
+.form-control.status-filter-select,
+.form-control.payment-filter-select,
+select.form-control {
+  background: #ffffff !important;
+  border: 2px solid #dee2e6 !important;
+  color: #212529 !important;
+  font-weight: 500 !important;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05) !important;
+  cursor: pointer !important;
+}
+
+.form-control.status-filter-select:hover,
+.form-control.payment-filter-select:hover,
+select.form-control:hover {
+  border-color: #adb5bd !important;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1) !important;
+}
+
+.form-control.status-filter-select:focus,
+.form-control.payment-filter-select:focus,
+select.form-control:focus {
+  outline: none !important;
+  border-color: var(--primary) !important;
+  box-shadow: 0 0 0 3px rgba(230, 57, 70, 0.15) !important;
+  background: #ffffff !important;
+}
+
 .form-control:focus {
   outline: none;
   border-color: var(--primary);
@@ -1004,12 +1032,15 @@ html, body {
 /* ===== PRODUCTS TABLE ===== */
 .products-table-container {
   background: var(--card-bg);
-  border-radius: var(--border-radius);
-  padding: 1.5rem;
+  border-radius: 0 0 var(--border-radius) var(--border-radius);
+  padding: 0 1.5rem 1.5rem 1.5rem;
+  padding-top: 0 !important;
   box-shadow: 0 4px 12px var(--shadow);
   border: 1px solid var(--input-border);
+  border-top: none;
   overflow-x: auto;
   margin-bottom: 2rem;
+  margin-top: 0 !important;
 }
 
 .products-table {
@@ -1146,12 +1177,63 @@ html, body {
 .orders-table-container,
 .walkin-orders-table-container {
   background: var(--card-bg);
-  border-radius: var(--border-radius);
-  padding: 1.5rem;
+  border-radius: 0 0 var(--border-radius) var(--border-radius);
+  padding: 0 1.5rem 1.5rem 1.5rem;
+  padding-top: 0 !important;
   box-shadow: 0 4px 12px var(--shadow);
   border: 1px solid var(--input-border);
+  border-top: none;
   overflow-x: auto;
   margin-bottom: 2rem;
+  margin-top: 0 !important;
+}
+
+/* Ensure tab content is visible when displayed */
+#ordersTabContent[style*="display: block"],
+#returnsTabContent[style*="display: block"],
+#ordersTabContent[style*="display:block"],
+#returnsTabContent[style*="display:block"] {
+  display: block !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  height: auto !important;
+  min-height: auto !important;
+}
+
+/* Ensure orders and returns tab content containers are visible */
+#ordersTabContent,
+#returnsTabContent {
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
+#ordersTabContent:not([style*="display: none"]):not([style*="display:none"]),
+#returnsTabContent:not([style*="display: none"]):not([style*="display:none"]) {
+  display: block !important;
+}
+
+/* Ensure tbody is always visible */
+.orders-table tbody,
+.returns-table tbody {
+  display: table-row-group !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
+/* Ensure table rows are visible */
+.orders-table tbody tr,
+.returns-table tbody tr {
+  display: table-row !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
+/* Ensure table cells are visible */
+.orders-table tbody td,
+.returns-table tbody td {
+  display: table-cell !important;
+  visibility: visible !important;
+  opacity: 1 !important;
 }
 
 .orders-table {
@@ -2350,12 +2432,15 @@ html, body {
 /* ===== RETURNS & EXCHANGES SECTION ===== */
 .returns-table-container {
     background: var(--card-bg);
-    border-radius: var(--border-radius);
-    padding: 1.5rem;
+    border-radius: 0 0 var(--border-radius) var(--border-radius);
+    padding: 0 1.5rem 1.5rem 1.5rem;
+    padding-top: 0 !important;
     box-shadow: 0 4px 12px var(--shadow);
     border: 1px solid var(--input-border);
+    border-top: none;
     overflow-x: auto;
     margin-bottom: 2rem;
+    margin-top: 0 !important;
 }
 
 .returns-table {

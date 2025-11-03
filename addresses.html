@@ -355,19 +355,37 @@
         
         /* Loading spinner */
         .loading-spinner {
-            display: inline-block;
-            width: 16px;
-            height: 16px;
-            border: 2px solid #f3f3f3;
-            border-top: 2px solid #e63946;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 400px;
+            width: 100%;
+            padding: 3rem;
+            color: #666;
+            text-align: center;
+            grid-column: 1 / -1;
+        }
+
+        .loading-spinner .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #e63946;
             border-radius: 50%;
             animation: spin 1s linear infinite;
-            margin-right: 0.5rem;
+            margin-bottom: 1rem;
         }
         
         @keyframes spin {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
+        }
+
+        .loading-spinner p {
+            margin: 0;
+            font-size: 1.1rem;
+            color: #666;
         }
         
         /* Responsive */
@@ -626,6 +644,53 @@
         const GEOAPIFY_API_KEY = 'a85e803098a1455da0da79145e5ca8e1';
         const GEOAPIFY_BASE_URL = 'https://api.geoapify.com/v1/geocode/autocomplete';
 
+        // CRITICAL: Start API call IMMEDIATELY when script loads, before DOMContentLoaded
+        // Check authentication and start fetching addresses immediately using email
+        (function startAddressFetch() {
+            if (!Auth.isLoggedIn()) {
+                // Will redirect on DOMContentLoaded, but don't block fetch
+                return;
+            }
+
+            const user = Auth.getCurrentUser();
+            if (user && user.email) {
+                // Start fetch immediately using email, don't wait for DOMContentLoaded
+                window.addressesPromise = fetch('http://localhost:3000/api/user-addresses?email=' + encodeURIComponent(user.email))
+                    .then(response => {
+                        if (!response.ok) throw new Error('Failed to fetch addresses from server');
+                        return response.json();
+                    })
+                    .then(addresses => {
+                        // Map _id to id for frontend compatibility
+                        return addresses.map(addr => ({
+                            ...addr,
+                            id: addr.id || addr._id // Use id if present, else _id
+                        }));
+                    })
+                    .catch(error => {
+                        console.error('Error fetching addresses:', error);
+                        return [];
+                    });
+            }
+        })();
+
+        // Loading functions
+        function showLoadingAddresses() {
+            const grid = document.getElementById('addressesGrid');
+            if (grid) {
+                grid.innerHTML = `
+                    <div class="loading-spinner" style="grid-column: 1 / -1;">
+                        <div class="spinner"></div>
+                        <p>Loading addresses...</p>
+                    </div>
+                `;
+            }
+        }
+
+        function hideLoadingAddresses() {
+            // Loading will be hidden when renderAddresses() is called
+        }
+
         // Initialize page
         document.addEventListener('DOMContentLoaded', async function() {
             // Check authentication
@@ -636,11 +701,26 @@
 
             currentUser = Auth.getCurrentUser();
             
-            // Initialize page components
+            // Show loading spinner immediately
+            showLoadingAddresses();
+            
+            // If promise exists from immediate fetch above, use it
+            if (window.addressesPromise) {
+                try {
+                    const addresses = await window.addressesPromise;
+                    userAddresses = addresses;
+                    renderAddresses();
+                    setupEventListeners();
+                    Auth.updateCartCount();
+                    return;
+                } catch (error) {
+                    console.error('Error using addresses promise:', error);
+                }
+            }
+            
+            // Fallback: call initializeAddresses if promise wasn't created
             await initializeAddresses();
             setupEventListeners();
-            
-            // Update cart count
             Auth.updateCartCount();
         });
 
@@ -657,11 +737,16 @@
             }
         }
 
-        // Load user addresses from database/storage
+        // Load user addresses from database/storage using email
         async function loadUserAddresses() {
             try {
-                // Fetch from backend API instead of localStorage
-                const response = await fetch('http://localhost:3000/api/user-addresses?userId=' + encodeURIComponent(currentUser.id));
+                // Fetch from backend API using email instead of userId
+                const email = currentUser.email;
+                if (!email) {
+                    throw new Error('User email not found');
+                }
+                
+                const response = await fetch('http://localhost:3000/api/user-addresses?email=' + encodeURIComponent(email));
                 if (!response.ok) throw new Error('Failed to fetch addresses from server');
                 const addresses = await response.json();
                 // Map _id to id for frontend compatibility
@@ -775,21 +860,28 @@
                 return;
             }
             try {
+                // Show loading spinner
+                showLoadingAddresses();
+                
                 const response = await fetch('http://localhost:3000/api/user-addresses/' + encodeURIComponent(addressId), {
                     method: 'DELETE'
                 });
                 if (!response.ok) throw new Error('Failed to delete address');
-                    showToast('Address deleted successfully', 'success');
+                showToast('Address deleted successfully', 'success');
                 await initializeAddresses();
             } catch (error) {
                 console.error('Error deleting address:', error);
                 showToast('Failed to delete address', 'error');
+                hideLoadingAddresses();
             }
         }
 
         // Toggle default address via API
         async function toggleDefault(addressId) {
             try {
+                // Show loading spinner
+                showLoadingAddresses();
+                
                 const response = await fetch('http://localhost:3000/api/user-addresses/' + encodeURIComponent(addressId) + '/default', {
                     method: 'PUT'
                 });
@@ -799,6 +891,7 @@
             } catch (error) {
                 console.error('Error updating default address:', error);
                 showToast('Failed to update default address', 'error');
+                hideLoadingAddresses();
             }
         }
 

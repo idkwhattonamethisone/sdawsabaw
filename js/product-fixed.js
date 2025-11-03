@@ -4,9 +4,124 @@ function formatPHPPrice(price) {
     return '₱' + price.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
 }
 
+// CRITICAL: Start API call IMMEDIATELY when script loads, before DOMContentLoaded
+// Get product ID from URL immediately
+(function startProductFetch() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const productIdParam = urlParams.get('id') || urlParams.get('productId');
+    
+    if (productIdParam) {
+        // Start fetch immediately, don't wait for DOMContentLoaded
+        window.productDetailsPromise = fetch(`http://localhost:3000/api/products/${productIdParam}`).then(response => {
+            if (!response.ok) throw new Error('Failed to fetch product');
+            return response.json();
+        }).catch(error => {
+            console.error('Error fetching product:', error);
+            return null;
+        });
+    }
+})();
+
 // Load product from database based on URL parameter
 async function loadProductDetails() {
     const productId = getUrlParameter('id');
+    
+    // If promise exists from immediate fetch above, use it instead of fetching again
+    if (window.productDetailsPromise && productId) {
+        try {
+            const productData = await window.productDetailsPromise;
+            if (productData) {
+                // Process product directly using existing logic
+                const price = typeof productData.price === 'object' ? 
+                    parseFloat(productData.price.$numberDecimal) : 
+                    parseFloat(productData.price);
+                
+                // Store the current product data for cart operations
+                window.currentProduct = {
+                    id: productData._id,
+                    name: productData.name,
+                    price: price,
+                    image: productData.image,
+                    category: productData.category,
+                    stock: productData.stockQuantity
+                };
+                
+                // Update product information in the page (extract from existing logic)
+                document.getElementById('productTitle').textContent = productData.name;
+                const breadcrumbProductName = document.getElementById('productName');
+                if (breadcrumbProductName) breadcrumbProductName.textContent = productData.name;
+                document.getElementById('productPrice').textContent = price.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                
+                // Set product image
+                const productImage = document.getElementById('productImage');
+                if (productData.image) {
+                    productImage.src = productData.image;
+                    productImage.onerror = () => { productImage.src = 'images/sanrico_logo_1.png'; };
+                } else {
+                    productImage.src = 'images/sanrico_logo_1.png';
+                }
+                
+                // Update stock indicator
+                const stockIndicator = document.getElementById('stockIndicator');
+                if (stockIndicator) {
+                    const stockDot = stockIndicator.querySelector('.stock-dot');
+                    const stockText = stockIndicator.querySelector('.stock-text');
+                    if (productData.stockQuantity > 0) {
+                        stockIndicator.classList.remove('out-of-stock');
+                        if (stockText) stockText.textContent = 'IN STOCK';
+                    } else {
+                        stockIndicator.classList.add('out-of-stock');
+                        if (stockText) stockText.textContent = 'OUT OF STOCK';
+                    }
+                }
+                
+                const productCategory = document.getElementById('productCategory');
+                if (productCategory) {
+                    productCategory.textContent = productData.category || 'General Category';
+                    productCategory.href = `shop.html?category=${mapCategoryToUrl(productData.category)}`;
+                }
+                
+                const productItemNumber = document.getElementById('productItemNumber');
+                if (productItemNumber) productItemNumber.textContent = productData._id.slice(-12) || '000000000000';
+                
+                const productMetaDescription = document.getElementById('productMetaDescription');
+                if (productMetaDescription) {
+                    const shortDescription = productData.description ? 
+                        (productData.description.length > 50 ? productData.description.substring(0, 50) + '...' : productData.description) :
+                        'No description available';
+                    productMetaDescription.textContent = shortDescription;
+                }
+                
+                // Update add to cart button state
+                const addToCartBtn = document.getElementById('addToCartBtn');
+                const buyNowBtn = document.getElementById('buyNowBtn');
+                
+                if (productData.stockQuantity === 0) {
+                    if (addToCartBtn) { addToCartBtn.disabled = true; addToCartBtn.textContent = 'OUT OF STOCK'; }
+                    if (buyNowBtn) { buyNowBtn.disabled = true; buyNowBtn.textContent = 'OUT OF STOCK'; }
+                } else {
+                    const cart = JSON.parse(localStorage.getItem(`cart_${JSON.parse(localStorage.getItem('currentUser') || 'null')?.id || 'guest'}`)) || { items: [] };
+                    const currentQuantityInCart = cart.items.find(item => item.id === productId)?.quantity || 0;
+                    if (currentQuantityInCart >= productData.stockQuantity) {
+                        if (addToCartBtn) { addToCartBtn.disabled = true; addToCartBtn.textContent = 'STOCK LIMIT REACHED'; }
+                        if (buyNowBtn) { buyNowBtn.disabled = true; buyNowBtn.textContent = 'STOCK LIMIT REACHED'; }
+                    } else {
+                        if (addToCartBtn) { addToCartBtn.disabled = false; addToCartBtn.textContent = 'ADD TO CART'; }
+                        if (buyNowBtn) { buyNowBtn.disabled = false; buyNowBtn.textContent = 'BUY NOW'; }
+                    }
+                }
+                
+                const stockCount = document.getElementById('stockCount');
+                if (stockCount) stockCount.textContent = `(${productData.stockQuantity} available)`;
+                
+                loadRelatedProducts(productData._id, productData.category);
+                updateQuantityLimits();
+                return; // Skip the fetch below
+            }
+        } catch (error) {
+            console.error('Error using product promise:', error);
+        }
+    }
     
     if (!productId) {
         console.error('No product ID provided in URL');
@@ -472,11 +587,28 @@ function handleQuantityBlur() {
     }
 }
 
-document.addEventListener('DOMContentLoaded', () => {
-    // Initialize the page by loading product details
-    loadProductDetails();
+document.addEventListener('DOMContentLoaded', async () => {
+    // If product promise exists (started above), use it
+    if (window.productDetailsPromise) {
+        try {
+            const productData = await window.productDetailsPromise;
+            if (productData) {
+                // Process product data directly (don't call loadProductDetails again)
+                window.currentProduct = productData;
+                // The loadProductDetails function will skip the fetch and use this
+                await loadProductDetails();
+            } else {
+                loadProductDetails(); // Fallback
+            }
+        } catch (error) {
+            console.error('Error processing product:', error);
+            loadProductDetails(); // Fallback
+        }
+    } else {
+        loadProductDetails();
+    }
 
-    // Attach event listeners
+    // Attach event listeners (after API call initiated)
     const addToCartBtn = document.getElementById('addToCartBtn');
     if (addToCartBtn) {
         addToCartBtn.addEventListener('click', addToCart);

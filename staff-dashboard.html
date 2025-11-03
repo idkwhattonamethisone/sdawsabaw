@@ -145,6 +145,8 @@
         .orders-table-container {
             max-height: 70vh;
             overflow-y: auto;
+            margin-top: 0 !important;
+            padding-top: 0 !important;
         }
 
         /* Compact payment badges */
@@ -210,6 +212,8 @@
         .products-table-container {
             max-height: 60vh;
             overflow-y: auto;
+            margin-top: 0 !important;
+            padding-top: 0 !important;
         }
 
         .product-table-image {
@@ -248,34 +252,43 @@
         .tab-navigation {
             display: flex;
             gap: 0.5rem;
-            margin: 1rem 0;
+            margin: 0 0 0 0;
+            margin-bottom: 0;
             border-bottom: 2px solid #e0e0e0;
         }
 
         .tab-btn {
-            background: none;
-            border: none;
+            background: #ffffff !important;
+            border: 2px solid #dee2e6 !important;
             padding: 0.75rem 1.5rem;
             cursor: pointer;
             font-size: 0.9rem;
-            font-weight: 600;
-            color: #666;
-            border-bottom: 3px solid transparent;
+            font-weight: 600 !important;
+            color: #495057 !important;
+            border-radius: 8px 8px 0 0;
             transition: all 0.3s ease;
             display: flex;
             align-items: center;
             gap: 0.5rem;
+            position: relative;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+            margin-bottom: -2px;
         }
 
         .tab-btn:hover {
-            color: #333;
-            background: rgba(0, 0, 0, 0.05);
+            color: #212529 !important;
+            background: #f8f9fa !important;
+            border-color: #adb5bd !important;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
         }
 
         .tab-btn.active {
-            color: #e63946;
-            border-bottom-color: #e63946;
-            background: rgba(230, 57, 70, 0.1);
+            color: #ffffff !important;
+            background: #e63946 !important;
+            border-color: #e63946 !important;
+            border-bottom-color: transparent !important;
+            box-shadow: 0 4px 8px rgba(230, 57, 70, 0.3);
+            z-index: 1;
         }
 
         .tab-badge {
@@ -295,6 +308,8 @@
 
         .tab-content {
             display: block;
+            margin-top: 0;
+            padding-top: 0;
         }
 
         .tab-content.hidden {
@@ -472,6 +487,8 @@
             gap: 1rem;
             justify-content: space-between;
             width: 100%;
+            margin-bottom: 0;
+            padding-bottom: 0;
         }
         
         .date-dropdown-container {
@@ -1305,7 +1322,7 @@
             <section class="content-section" id="products-section">
                 <div class="section-header">
                     <h1>Product Management</h1>
-                    <div class="section-controls">
+                    <div class="section-controls" style="margin-bottom: 0; padding-bottom: 0;">
                         <select id="categoryFilter" class="form-control">
                             <option value="all">All Categories</option>
                             <option value="tools-accessories">Tools & Accessories</option>
@@ -1371,7 +1388,7 @@
                             </div>
                         </div>
                         <div class="filters-with-refresh">
-                            <select id="orderStatusFilter" class="form-control">
+                            <select id="orderStatusFilter" class="form-control status-filter-select">
                                 <option value="all">All Orders</option>
                                 <option value="pending">Pending</option>
                                 <option value="approved">Approved</option>
@@ -1380,7 +1397,7 @@
                                 <option value="cancelled">Cancelled</option>
                                 <option value="completed">Walk-in/Completed</option>
                             </select>
-                            <select id="paymentMethodFilter" class="form-control">
+                            <select id="paymentMethodFilter" class="form-control payment-filter-select">
                                 <option value="all">All Payment Methods</option>
                                 <option value="cash">Cash</option>
                                 <option value="gcash">GCash</option>
@@ -1403,7 +1420,7 @@
                 </div>
 
                 <!-- Orders Tab Content -->
-                <div class="tab-content" id="ordersTabContent" style="display: block;">
+                <div class="tab-content" id="ordersTabContent" style="display: block; margin-top: 0; padding-top: 0;">
                     <div class="orders-table-container">
                         <table class="orders-table" id="ordersTable">
                         <thead>
@@ -1428,17 +1445,7 @@
                 </div>
 
                 <!-- Returns Tab Content -->
-                <div class="tab-content" id="returnsTabContent" style="display: none;">
-                    <div class="returns-filters">
-                        <select id="returnStatusFilter" class="form-control">
-                            <option value="all">All Returns</option>
-                            <option value="pending_review">Pending Review</option>
-                            <option value="approved">Approved</option>
-                            <option value="rejected">Rejected</option>
-                            <option value="completed">Completed</option>
-                        </select>
-                        <button class="action-btn primary" id="refreshReturnsBtn">🔄 Refresh</button>
-                    </div>
+                <div class="tab-content" id="returnsTabContent" style="display: none; margin-top: 0; padding-top: 0;">
                     <div class="returns-table-container">
                         <table class="returns-table" id="returnsTable">
                             <thead>
@@ -1860,11 +1867,11 @@
     <div class="toast" id="toast"></div>
 
     <!-- Dashboard Loading Overlay -->
-    <div class="dashboard-loading" id="dashboardLoading">
+    <div class="dashboard-loading show" id="dashboardLoading">
         <div class="dashboard-spinner">
             <div class="spinner"></div>
             <div class="loading-text">
-                Loading Staff Dashboard<span class="loading-dots">...</span>
+                Authenticating<span class="loading-dots">...</span>
             </div>
         </div>
     </div>
@@ -1891,11 +1898,8 @@
 
         // Initialize staff system with retry mechanism to ensure localStorage is ready
         function initializeStaffDashboard() {
-            // Show loading screen immediately
+            // Transition dashboard loading overlay disabled
             const dashboardLoading = document.getElementById('dashboardLoading');
-            if (dashboardLoading) {
-                dashboardLoading.classList.add('show');
-            }
             
             let attempts = 0;
             const maxAttempts = 10;
@@ -1924,26 +1928,26 @@
                     // Update loading text
                     const loadingText = dashboardLoading?.querySelector('.loading-text');
                     if (loadingText) {
-                        loadingText.innerHTML = 'Setting up dashboard<span class="loading-dots">...</span>';
+                        loadingText.innerHTML = 'Authenticating and setting up dashboard<span class="loading-dots">...</span>';
                     }
                     
-                    // Initialize dashboard with a slight delay for smooth transition
+                    // Initialize dashboard
                     setTimeout(() => {
                         window.staffDashboard = new EnhancedStaffDashboard();
                         
-                        // Hide loading screen after dashboard is initialized
+                        // Ensure overlay is hidden (noop if not present)
                         setTimeout(() => {
                             if (dashboardLoading) {
                                 dashboardLoading.classList.remove('show');
                             }
-                        }, 800);
+                        }, 0);
                     }, 300);
                     return;
                 }
                 
                 if (attempts >= maxAttempts) {
                     console.error('Failed to authenticate staff after maximum attempts, redirecting...');
-                    // Hide loading before redirect
+                    // Ensure overlay is not shown before redirect
                     if (dashboardLoading) {
                         dashboardLoading.classList.remove('show');
                     }
@@ -1987,6 +1991,7 @@
             constructor() {
                 this.products = [];
                 this.orders = [];
+                this.returns = [];
                 this.walkInOrders = []; // Will be loaded from database
                 this.notifications = JSON.parse(localStorage.getItem('staffNotifications') || '[]');
                 this.comprehensiveStats = null; // Will be loaded from database
@@ -2348,7 +2353,7 @@
             async loadDashboardData() {
                 try {
                     // PHASE 1: Try to use cached data first (INSTANT)
-                    if (this._cache.products && this._cache.orders && this._cache.products.length > 0 && this._cache.orders.length > 0) {
+                    if (this._cache.products && this._cache.orders !== undefined && this._cache.orders !== null && Array.isArray(this._cache.products) && Array.isArray(this._cache.orders) && this._cache.products.length > 0) {
                         this.products = this._cache.products;
                         this.orders = this._cache.orders;
                         this.calculateStatsFromLoadedData();
@@ -2493,7 +2498,10 @@
                     }
                     if (this.currentSection === 'orders') {
                         console.log('🔄 Loading data for orders section');
-                        await this.loadOrders(); // This now also loads returns
+                        await this.loadOrders();
+                        await this.loadReturns();
+                        console.log('✅ Orders loaded:', this.orders.length);
+                        console.log('✅ Returns loaded:', this.returns.length);
                         this.renderCurrentSection();
                         Promise.allSettled([
                             this.loadProducts(),
@@ -2684,62 +2692,58 @@
             async loadOrders() {
                 try {
                     console.log('🔄 loadOrders() called');
-                    // Use cached orders if available
-                    if (this._cache.orders && this._cache.orders.length > 0) {
+                    // Use cached orders if available (even if empty)
+                    if (this._cache.orders !== undefined && this._cache.orders !== null) {
                         console.log('📊 Using cached orders:', this._cache.orders.length);
-                        this.orders = this._cache.orders;
-                    } else {
-                        console.log('🔄 Loading orders from API...');
-                        // Fetch orders from all collections (pending, accepted, delivered)
-                        const response = await fetch('http://localhost:3000/api/orders/all-staff');
+                        this.orders = Array.isArray(this._cache.orders) ? this._cache.orders : [];
                         
-                        if (!response.ok) throw new Error('Failed to fetch orders');
-
-                        this.orders = await response.json();
-                        console.log('📊 Orders loaded from API:', this.orders.length);
+                        // Update tab badge with total orders count
+                        const ordersTabBadge = document.getElementById('ordersTabBadge');
+                        if (ordersTabBadge && this.orders) {
+                            ordersTabBadge.textContent = this.orders.length;
+                        }
                         
-                        // Cache the orders
-                        this._cache.orders = this.orders;
-                        this._cache.timestamp = Date.now();
+                        return;
                     }
 
-                    // Update orders badge
-                    const ordersBadge = document.getElementById('ordersBadge');
-                    const pendingOrders = this.orders.filter(o => o.collection === 'pending').length;
-                    ordersBadge.textContent = pendingOrders;
-
-                    // Update orders nav button title
-                    const ordersNavButton = document.getElementById('ordersNavButton');
-                    if (pendingOrders === 0) {
-                        ordersNavButton.title = 'No pending orders';
-                    } else {
-                        ordersNavButton.title = `${pendingOrders} pending order${pendingOrders > 1 ? 's' : ''}`;
+                    console.log('🔄 Loading orders from API...');
+                    // Fetch orders from all collections (pending, accepted, delivered)
+                    const response = await fetch('http://localhost:3000/api/orders/all-staff');
+                    
+                    if (!response.ok) {
+                        throw new Error('Failed to fetch orders');
                     }
 
-                    // Update tab badges
+                    const data = await response.json();
+                    this.orders = Array.isArray(data) ? data : [];
+                    console.log('📊 Orders loaded from API:', this.orders.length);
+                    
+                    // Cache the orders
+                    this._cache.orders = this.orders;
+                    this._cache.timestamp = Date.now();
+
+                    // Update tab badge with total orders count
                     const ordersTabBadge = document.getElementById('ordersTabBadge');
-                    if (ordersTabBadge) {
-                        ordersTabBadge.textContent = pendingOrders;
+                    if (ordersTabBadge && this.orders) {
+                        ordersTabBadge.textContent = this.orders.length;
                     }
 
                     this.checkForNewOrders();
 
-                    // Load returns at the same time
-                    await this.loadReturns();
-
                 } catch (error) {
                     console.error('Error loading orders:', error);
                     this.orders = [];
+                    this._cache.orders = [];
                 }
             }
 
             async loadReturns() {
                 try {
                     console.log('🔄 loadReturns() called');
-                    // Use cached returns if available
-                    if (this._cache.returns && this._cache.returns.length > 0) {
+                    // Use cached returns if available (even if empty)
+                    if (this._cache.returns !== undefined && this._cache.returns !== null) {
                         console.log('📦 Using cached returns:', this._cache.returns.length);
-                        this.returns = this._cache.returns;
+                        this.returns = Array.isArray(this._cache.returns) ? this._cache.returns : [];
                         return;
                     }
 
@@ -2749,9 +2753,9 @@
                     if (!response.ok) throw new Error('Failed to fetch return requests');
 
                     const data = await response.json();
-                    console.log('📦 Returns API response:', data);
-                    this.returns = data.returnRequests || [];
-                    console.log('📦 Processed returns:', this.returns);
+                    // Handle both array response and object with returnRequests property
+                    this.returns = Array.isArray(data) ? data : (data.returnRequests || []);
+                    console.log('📦 Returns loaded from API:', this.returns.length);
                     
                     // Cache the returns
                     this._cache.returns = this.returns;
@@ -2767,9 +2771,9 @@
                     // Update tab badges
                     const ordersTabBadge = document.getElementById('ordersTabBadge');
                     const returnsTabBadge = document.getElementById('returnsTabBadge');
-                    if (ordersTabBadge) {
-                        const pendingOrders = this.orders ? this.orders.filter(o => o.collection === 'pending').length : 0;
-                        ordersTabBadge.textContent = pendingOrders;
+                    if (ordersTabBadge && this.orders) {
+                        // Show total orders count in the badge
+                        ordersTabBadge.textContent = this.orders.length;
                     }
                     if (returnsTabBadge) {
                         returnsTabBadge.textContent = pendingReturns;
@@ -2778,6 +2782,7 @@
                 } catch (error) {
                     console.error('Error loading returns:', error);
                     this.returns = [];
+                    this._cache.returns = [];
                 }
             }
 
@@ -3178,16 +3183,35 @@
                 });
 
                 document.getElementById('refreshOrdersBtn').addEventListener('click', async () => {
-                    this.showLoadingOrders();
-                    await this.loadOrders();
-                    this.renderOrders();
-                    showToast('Orders refreshed', 'success');
+                    // Check which tab is active
+                    const ordersTabBtn = document.getElementById('ordersTabBtn');
+                    const returnsTabBtn = document.getElementById('returnsTabBtn');
+                    
+                    if (ordersTabBtn && ordersTabBtn.classList.contains('active')) {
+                        this.showLoadingOrders();
+                        await this.loadOrders();
+                        this.renderOrders();
+                        showToast('Orders refreshed', 'success');
+                    } else if (returnsTabBtn && returnsTabBtn.classList.contains('active')) {
+                        this.showLoadingReturns();
+                        await this.loadReturns();
+                        this.renderReturns();
+                        showToast('Returns refreshed', 'success');
+                    }
                 });
 
                 // Order search functionality
                 document.getElementById('orderSearch').addEventListener('input', () => {
                     this.currentPage = 1;
-                    this.renderOrders();
+                    // Check which tab is active
+                    const ordersTabBtn = document.getElementById('ordersTabBtn');
+                    const returnsTabBtn = document.getElementById('returnsTabBtn');
+                    
+                    if (ordersTabBtn && ordersTabBtn.classList.contains('active')) {
+                        this.renderOrders();
+                    } else if (returnsTabBtn && returnsTabBtn.classList.contains('active')) {
+                        this.renderReturns();
+                    }
                 });
 
                 // Tab switching functionality
@@ -3199,17 +3223,19 @@
                     this.switchTab('returns');
                 });
 
-                // Returns refresh functionality
-                document.getElementById('refreshReturnsBtn').addEventListener('click', async () => {
-                    this.showLoadingReturns();
-                    await this.loadReturns();
-                    this.renderReturns();
-                    showToast('Returns refreshed', 'success');
-                });
-
-                // Returns filter functionality
-                document.getElementById('returnStatusFilter').addEventListener('change', () => {
-                    this.renderReturns();
+                // Status filter functionality (works for both orders and returns)
+                document.getElementById('orderStatusFilter').addEventListener('change', () => {
+                    if (this.currentSection === 'orders') {
+                        // Check which tab is active
+                        const ordersTabBtn = document.getElementById('ordersTabBtn');
+                        const returnsTabBtn = document.getElementById('returnsTabBtn');
+                        
+                        if (ordersTabBtn && ordersTabBtn.classList.contains('active')) {
+                            this.renderOrders();
+                        } else if (returnsTabBtn && returnsTabBtn.classList.contains('active')) {
+                            this.renderReturns();
+                        }
+                    }
                 });
 
                 // Date dropdown functionality
@@ -3487,8 +3513,6 @@
             }
 
             switchTab(tab) {
-                console.log('🔄 Switching to tab:', tab);
-                
                 // Update tab buttons
                 document.querySelectorAll('.tab-btn').forEach(btn => {
                     btn.classList.remove('active');
@@ -3496,8 +3520,6 @@
                 const activeTabBtn = document.querySelector(`[data-tab="${tab}"]`);
                 if (activeTabBtn) {
                     activeTabBtn.classList.add('active');
-                } else {
-                    console.error('❌ Tab button not found:', tab);
                 }
 
                 // Update tab content
@@ -3507,21 +3529,57 @@
                 const activeTabContent = document.getElementById(`${tab}TabContent`);
                 if (activeTabContent) {
                     activeTabContent.style.display = 'block';
-                    console.log('✅ Tab content displayed:', tab);
-                } else {
-                    console.error('❌ Tab content not found:', `${tab}TabContent`);
                 }
+
+                // Update filter dropdowns based on active tab
+                this.updateFiltersForTab(tab);
 
                 // Render the appropriate content
                 if (tab === 'orders') {
-                    console.log('🔄 Rendering orders...');
-                    console.log('📊 Orders data before render:', this.orders);
                     this.renderOrders();
                 } else if (tab === 'returns') {
-                    console.log('🔄 Rendering returns...');
-                    console.log('📦 Returns data before render:', this.returns);
                     this.renderReturns();
                 }
+            }
+
+            updateFiltersForTab(tab) {
+                const orderStatusFilter = document.getElementById('orderStatusFilter');
+                const paymentMethodFilter = document.getElementById('paymentMethodFilter');
+                
+                if (!orderStatusFilter) return;
+
+                if (tab === 'orders') {
+                    // Show orders filter options
+                    orderStatusFilter.innerHTML = `
+                        <option value="all">All Orders</option>
+                        <option value="pending">Pending</option>
+                        <option value="approved">Approved</option>
+                        <option value="delivered">Delivered</option>
+                        <option value="returned">Returned</option>
+                        <option value="cancelled">Cancelled</option>
+                        <option value="completed">Walk-in/Completed</option>
+                    `;
+                    // Show payment method filter
+                    if (paymentMethodFilter) {
+                        paymentMethodFilter.style.display = '';
+                    }
+                } else if (tab === 'returns') {
+                    // Show returns filter options
+                    orderStatusFilter.innerHTML = `
+                        <option value="all">All Returns</option>
+                        <option value="pending_review">Pending Review</option>
+                        <option value="approved">Approved</option>
+                        <option value="rejected">Rejected</option>
+                        <option value="completed">Completed</option>
+                    `;
+                    // Hide payment method filter for returns
+                    if (paymentMethodFilter) {
+                        paymentMethodFilter.style.display = 'none';
+                    }
+                }
+                
+                // Reset to 'all' when switching tabs
+                orderStatusFilter.value = 'all';
             }
 
             renderCurrentSection() {
@@ -3530,39 +3588,47 @@
                     this.showLoadingProducts();
                     this.renderProducts();
                 } else if (this.currentSection === 'orders') {
-                    console.log('🔄 Rendering orders section');
                     this.showLoadingOrders();
-                    // Ensure orders tab is active by default
-                    this.switchTab('orders');
-                    // Force show orders tab content immediately
+                    // Ensure orders tab is active (without rendering)
+                    document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+                    document.querySelectorAll('.tab-content').forEach(content => content.style.display = 'none');
+                    const ordersTabBtn = document.querySelector('[data-tab="orders"]');
                     const ordersTabContent = document.getElementById('ordersTabContent');
-                    const ordersTableContainer = document.querySelector('.orders-table-container');
-                    const ordersTable = document.getElementById('ordersTable');
+                    if (ordersTabBtn) ordersTabBtn.classList.add('active');
+                    if (ordersTabContent) ordersTabContent.style.display = 'block';
                     
-                    if (ordersTabContent) {
-                        ordersTabContent.style.display = 'block';
-                        console.log('✅ Orders tab content forced to display');
-                    }
+                    // Update filters for orders tab
+                    this.updateFiltersForTab('orders');
                     
-                    if (ordersTableContainer) {
-                        ordersTableContainer.style.display = 'block';
-                        ordersTableContainer.style.visibility = 'visible';
-                        console.log('✅ Orders table container forced to display');
-                    }
-                    
-                    if (ordersTable) {
-                        ordersTable.style.display = 'table';
-                        ordersTable.style.visibility = 'visible';
-                        console.log('✅ Orders table forced to display');
-                    }
-                    // Force render orders after tab switch
-                    setTimeout(() => {
+                    // Load orders if not loaded, then render
+                    if (!this.orders || this.orders.length === 0) {
+                        this.loadOrders().then(() => {
+                            this.renderOrders();
+                            this.hideLoadingOrders();
+                        }).catch(() => {
+                            this.renderOrders();
+                            this.hideLoadingOrders();
+                        });
+                    } else {
                         this.renderOrders();
-                    }, 100);
+                        this.hideLoadingOrders();
+                    }
                 } else if (this.currentSection === 'returns') {
-                    console.log('🔄 Rendering returns section');
                     this.showLoadingReturns();
-                    this.renderReturns();
+                    this.switchTab('returns');
+                    // updateFiltersForTab is called inside switchTab, so no need to call it again
+                    if (!this.returns || this.returns.length === 0) {
+                        this.loadReturns().then(() => {
+                            this.renderReturns();
+                            this.hideLoadingReturns();
+                        }).catch(() => {
+                            this.renderReturns();
+                            this.hideLoadingReturns();
+                        });
+                    } else {
+                        this.renderReturns();
+                        this.hideLoadingReturns();
+                    }
                 } else if (this.currentSection === 'dashboard') {
                     // Show loading for dashboard sections when switching to dashboard
                     this.showLoadingRecentActivity();
@@ -3729,38 +3795,33 @@
             }
 
             renderOrders() {
-                console.log('🔄 renderOrders() called');
                 const tbody = document.getElementById('ordersTableBody');
                 if (!tbody) {
-                    console.error('❌ ordersTableBody element not found');
+                    console.error('❌ ordersTableBody not found');
                     return;
                 }
                 
-                // Force show table content immediately for testing
-                console.log('🔄 Forcing table content display...');
-                tbody.style.display = 'table-row-group';
-                tbody.style.visibility = 'visible';
+                console.log('🔄 renderOrders() called');
+                console.log('📊 this.orders:', this.orders);
+                console.log('📊 this.orders type:', typeof this.orders);
+                console.log('📊 this.orders isArray:', Array.isArray(this.orders));
+                console.log('📊 this.orders length:', this.orders ? this.orders.length : 'undefined');
                 
-                // Force show some test content immediately
-                tbody.innerHTML = `
-                    <tr>
-                        <td colspan="9" style="text-align: center; padding: 2rem; background: #f8f9fa; border: 2px dashed #dee2e6;">
-                            <div style="font-size: 1.2rem; color: #495057; margin-bottom: 1rem;">🔄 Loading Orders...</div>
-                            <div style="font-size: 0.9rem; color: #6c757d;">This is a test to verify table visibility</div>
-                        </td>
-                    </tr>
-                `;
+                // Ensure orders is an array
+                if (!Array.isArray(this.orders)) {
+                    console.warn('⚠️ this.orders is not an array, initializing:', this.orders);
+                    this.orders = [];
+                }
                 
-                const statusFilter = document.getElementById('orderStatusFilter').value;
-                const paymentFilter = document.getElementById('paymentMethodFilter').value;
-                const startDate = document.getElementById('orderStartDate').value;
-                const endDate = document.getElementById('orderEndDate').value;
+                const statusFilter = document.getElementById('orderStatusFilter')?.value || 'all';
+                const paymentFilter = document.getElementById('paymentMethodFilter')?.value || 'all';
+                const startDate = document.getElementById('orderStartDate')?.value || '';
+                const endDate = document.getElementById('orderEndDate')?.value || '';
                 
                 console.log('🔍 Rendering orders with filter:', statusFilter);
-                console.log('📊 Total orders before filtering:', this.orders ? this.orders.length : 0);
-                console.log('📊 Orders data:', this.orders);
+                console.log('📊 Total orders before filtering:', this.orders.length);
                 
-                let filteredOrders = this.orders || [];
+                let filteredOrders = this.orders;
                 
                 // Filter by search query first
                 const searchQuery = document.getElementById('orderSearch').value.toLowerCase().trim();
@@ -3780,11 +3841,7 @@
                 if (statusFilter !== 'all') {
                     filteredOrders = filteredOrders.filter(o => {
                         const displayStatus = o.displayStatus || o.status;
-                        const matches = displayStatus === statusFilter;
-                        if (!matches) {
-                            console.log(`❌ Order ${o._id?.slice(-6)} filtered out: displayStatus="${displayStatus}", filter="${statusFilter}"`);
-                        }
-                        return matches;
+                        return displayStatus === statusFilter;
                     });
                 }
                 
@@ -3792,38 +3849,22 @@
                 
                 // Filter by payment method
                 if (paymentFilter !== 'all') {
-                    console.log('🔍 Filtering by payment method:', paymentFilter);
                     filteredOrders = filteredOrders.filter(o => (o.paymentMethod || 'cod') === paymentFilter);
-                    console.log('📊 Orders after payment filtering:', filteredOrders.length);
                 }
                 
                 // Filter by date range
                 if (startDate) {
-                    console.log('🔍 Filtering by start date:', startDate);
-                    const beforeDateFilter = filteredOrders.length;
                     filteredOrders = filteredOrders.filter(o => {
                         const orderDate = new Date(o.createdAt || o.orderDate || o.original_date);
-                        const isValid = orderDate >= new Date(startDate);
-                        if (!isValid) {
-                            console.log(`❌ Order ${o._id?.slice(-6)} filtered out by start date: orderDate="${orderDate}", startDate="${startDate}"`);
-                        }
-                        return isValid;
+                        return orderDate >= new Date(startDate);
                     });
-                    console.log(`📊 Orders after start date filtering: ${beforeDateFilter} → ${filteredOrders.length}`);
                 }
                 
                 if (endDate) {
-                    console.log('🔍 Filtering by end date:', endDate);
-                    const beforeDateFilter = filteredOrders.length;
                     filteredOrders = filteredOrders.filter(o => {
                         const orderDate = new Date(o.createdAt || o.orderDate || o.original_date);
-                        const isValid = orderDate <= new Date(endDate + 'T23:59:59');
-                        if (!isValid) {
-                            console.log(`❌ Order ${o._id?.slice(-6)} filtered out by end date: orderDate="${orderDate}", endDate="${endDate}"`);
-                        }
-                        return isValid;
+                        return orderDate <= new Date(endDate + 'T23:59:59');
                     });
-                    console.log(`📊 Orders after end date filtering: ${beforeDateFilter} → ${filteredOrders.length}`);
                 }
                 
                 const start = (this.currentPage - 1) * this.itemsPerPage;
@@ -3831,34 +3872,16 @@
                 const displayed = filteredOrders.slice(start, end);
 
                 if (displayed.length === 0) {
-                    console.log('📊 No orders to display');
-                    // Show sample data for testing if no real data
-                    if (this.orders.length === 0) {
-                        console.log('📊 No orders data available, showing sample data');
-                        tbody.innerHTML = `
-                            <tr>
-                                <td>ORD-001</td>
-                                <td>Sample Customer</td>
-                                <td>2 items</td>
-                                <td>₱1,500.00</td>
-                                <td>Cash on Delivery</td>
-                                <td>Delivery</td>
-                                <td>${new Date().toLocaleDateString()}</td>
-                                <td><span class="status-badge pending">Pending</span></td>
-                                <td><button class="action-btn small">View</button></td>
-                            </tr>
-                            <tr>
-                                <td colspan="9" class="no-data">This is sample data. Check console for data loading issues.</td>
-                            </tr>
-                        `;
+                    if (filteredOrders.length === 0 && this.orders && this.orders.length > 0) {
+                        tbody.innerHTML = '<tr><td colspan="9" class="no-data">No orders found matching your filters</td></tr>';
                     } else {
                         tbody.innerHTML = '<tr><td colspan="9" class="no-data">No orders found</td></tr>';
                     }
+                    this.updatePagination('ordersPagination', filteredOrders.length);
                     return;
                 }
 
-                console.log('📊 Rendering', displayed.length, 'orders');
-
+                console.log('✅ Rendering', displayed.length, 'orders');
                 tbody.innerHTML = displayed.map(order => {
                     // Determine the correct status display based on collection and status
                     let statusDisplay = order.displayStatus || order.status;
@@ -3941,6 +3964,7 @@
                 }).join('');
 
                 this.updatePagination('ordersPagination', filteredOrders.length);
+                console.log('✅ Orders rendered:', displayed.length, 'orders displayed');
             }
 
             // renderWalkInOrders() - Disabled until database integration
@@ -3982,66 +4006,46 @@
             }
 
             renderReturns() {
-                console.log('🔄 renderReturns() called');
                 const tbody = document.getElementById('returnsTableBody');
                 if (!tbody) {
-                    console.error('❌ returnsTableBody element not found');
+                    console.error('returnsTableBody not found');
                     return;
                 }
                 
-                // Force show table content immediately for testing
-                console.log('🔄 Forcing returns table content display...');
-                tbody.style.display = 'table-row-group';
-                tbody.style.visibility = 'visible';
-                
-                const statusFilter = document.getElementById('returnStatusFilter').value;
+                const statusFilter = document.getElementById('orderStatusFilter')?.value || 'all';
 
-                console.log('🔄 Rendering returns with filter:', statusFilter);
-                console.log('📦 Total returns available:', this.returns ? this.returns.length : 0);
-                console.log('📦 Returns data:', this.returns);
+                // Ensure returns is an array
+                if (!Array.isArray(this.returns)) {
+                    this.returns = [];
+                }
 
                 let filteredReturns = this.returns || [];
 
                 // Filter by status
                 if (statusFilter !== 'all') {
                     filteredReturns = filteredReturns.filter(r => r.status === statusFilter);
-                    console.log('📦 Returns after status filtering:', filteredReturns.length);
                 }
 
                 // Sort by request date (newest first)
-                filteredReturns.sort((a, b) => new Date(b.requestDate || b.createdAt) - new Date(a.requestDate || a.createdAt));
+                filteredReturns.sort((a, b) => new Date(b.requestDate || b.createdAt || b.original_date) - new Date(a.requestDate || a.createdAt || a.original_date));
 
                 const start = (this.currentPage - 1) * this.itemsPerPage;
                 const end = start + this.itemsPerPage;
                 const displayed = filteredReturns.slice(start, end);
 
                 if (displayed.length === 0) {
-                    console.log('📦 No returns to display');
-                    // Show sample data for testing if no real data
-                    if (this.returns.length === 0) {
-                        console.log('📦 No returns data available, showing sample data');
-                        tbody.innerHTML = `
-                            <tr>
-                                <td>ORD-001</td>
-                                <td>Sample Customer</td>
-                                <td><span class="return-type-badge">Return</span></td>
-                                <td>Product defect</td>
-                                <td>1 item</td>
-                                <td>${new Date().toLocaleDateString()}</td>
-                                <td><span class="status-badge pending">Pending</span></td>
-                                <td><button class="action-btn small">View</button></td>
-                            </tr>
-                            <tr>
-                                <td colspan="8" class="no-data">This is sample data. Check console for data loading issues.</td>
-                            </tr>
-                        `;
-                    } else {
+                    if (!this.returns || this.returns.length === 0) {
                         tbody.innerHTML = '<tr><td colspan="8" class="no-data">No return requests found</td></tr>';
+                        // Try to load returns if not loaded
+                        this.loadReturns().then(() => {
+                            this.renderReturns();
+                        });
+                    } else {
+                        tbody.innerHTML = '<tr><td colspan="8" class="no-data">No return requests found matching your filters</td></tr>';
                     }
+                    this.updatePagination('returnsPagination', 0);
                     return;
                 }
-
-                console.log('📦 Rendering', displayed.length, 'returns');
 
                 tbody.innerHTML = displayed.map(returnRequest => {
                     const orderNumber = returnRequest.orderNumber || this.generateOrderNumber(returnRequest);

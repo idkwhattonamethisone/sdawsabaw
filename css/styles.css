@@ -5208,7 +5208,7 @@ h1, h2, h3, h4, h5, h6 {
     z-index: 10000;
     opacity: 0;
     visibility: hidden;
-    transition: opacity 0.4s ease, visibility 0.4s ease;
+    /* Transition removed to prevent second spinner appearance */
 }
 
 .dashboard-loading.show {
@@ -5218,7 +5218,7 @@ h1, h2, h3, h4, h5, h6 {
 
 .dashboard-spinner {
     text-align: center;
-    animation: dashboardEntrance 0.8s ease-out;
+    /* Animation removed to prevent second spinner appearance */
 }
 
 .dashboard-spinner .spinner {
