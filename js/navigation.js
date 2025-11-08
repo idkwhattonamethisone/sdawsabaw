@@ -24,6 +24,7 @@ class Navigation {
     applyPreloadStyles() {
         // Transition page loader disabled
         return;
+<<<<<<< HEAD
         try {
             // Allow opt-out or excluded pages
             const pathname = (location.pathname || '').toLowerCase();
@@ -62,6 +63,8 @@ class Navigation {
                 }, { once: true });
             }
         } catch(e) { /* noop */ }
+=======
+>>>>>>> restore_from_6h
     }
 
     setupPageLoader() {
@@ -70,6 +73,7 @@ class Navigation {
         try { document.body && document.body.classList.remove('preloading'); } catch(e) {}
         try { window.LoadingUtils && window.LoadingUtils.hide && window.LoadingUtils.hide(); } catch(e) {}
         return;
+<<<<<<< HEAD
         // Cleanup helper to ensure any early overlays/classes are removed
         const cleanupLoader = () => {
             try { document.documentElement.classList.remove('preloading'); } catch(e) {}
@@ -187,6 +191,8 @@ class Navigation {
         } else {
             window.addEventListener('load', ensureMinDurationThenHide);
         }
+=======
+>>>>>>> restore_from_6h
     }
 
     setActiveNavLink() {

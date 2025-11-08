@@ -127,6 +127,14 @@ app.post('/api/auth/complete-registration', async (req, res) => {
         if (!fullname || !email || !password) {
             return res.status(400).json({ error: 'All fields are required' });
         }
+        // Enforce password policy: 7–12 chars, include a digit, an uppercase, and one of . or !
+        const passwordPolicy = /^(?=.{7,12}$)(?=.*\d)(?=.*[A-Z])(?=.*[\.!]).*$/;
+        if (!passwordPolicy.test(String(password))) {
+            return res.status(400).json({ 
+                success: false,
+                message: 'Password must be 7–12 chars and include a number, an uppercase letter, and one of . or !'
+            });
+        }
         
         const db = await connectToDatabase();
         

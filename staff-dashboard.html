@@ -2724,8 +2724,14 @@
 
                     // Update tab badge with total orders count
                     const ordersTabBadge = document.getElementById('ordersTabBadge');
+<<<<<<< HEAD
                     if (ordersTabBadge && this.orders) {
                         ordersTabBadge.textContent = this.orders.length;
+=======
+                    if (ordersTabBadge) {
+                        const totalOrders = Array.isArray(this.orders) ? this.orders.length : 0;
+                        ordersTabBadge.textContent = totalOrders;
+>>>>>>> restore_from_6h
                     }
 
                     this.checkForNewOrders();
@@ -2771,12 +2777,19 @@
                     // Update tab badges
                     const ordersTabBadge = document.getElementById('ordersTabBadge');
                     const returnsTabBadge = document.getElementById('returnsTabBadge');
+<<<<<<< HEAD
                     if (ordersTabBadge && this.orders) {
                         // Show total orders count in the badge
                         ordersTabBadge.textContent = this.orders.length;
+=======
+                    if (ordersTabBadge) {
+                        const totalOrders = Array.isArray(this.orders) ? this.orders.length : 0;
+                        ordersTabBadge.textContent = totalOrders;
+>>>>>>> restore_from_6h
                     }
                     if (returnsTabBadge) {
-                        returnsTabBadge.textContent = pendingReturns;
+                        const totalReturns = Array.isArray(this.returns) ? this.returns.length : 0;
+                        returnsTabBadge.textContent = totalReturns;
                     }
 
                 } catch (error) {
@@ -3535,6 +3548,11 @@
                 this.updateFiltersForTab(tab);
 
                 // Render the appropriate content
+                // Update filter options to match active tab
+                if (typeof this.updateFiltersForTab === 'function') {
+                    this.updateFiltersForTab(tab);
+                }
+
                 if (tab === 'orders') {
                     this.renderOrders();
                 } else if (tab === 'returns') {
@@ -3542,6 +3560,7 @@
                 }
             }
 
+<<<<<<< HEAD
             updateFiltersForTab(tab) {
                 const orderStatusFilter = document.getElementById('orderStatusFilter');
                 const paymentMethodFilter = document.getElementById('paymentMethodFilter');
@@ -3550,6 +3569,14 @@
 
                 if (tab === 'orders') {
                     // Show orders filter options
+=======
+            // Dynamically update status/payment filters per active tab
+            updateFiltersForTab(tab) {
+                const orderStatusFilter = document.getElementById('orderStatusFilter');
+                const paymentMethodFilter = document.getElementById('paymentMethodFilter');
+                if (!orderStatusFilter) return;
+                if (tab === 'orders') {
+>>>>>>> restore_from_6h
                     orderStatusFilter.innerHTML = `
                         <option value="all">All Orders</option>
                         <option value="pending">Pending</option>
@@ -3559,12 +3586,17 @@
                         <option value="cancelled">Cancelled</option>
                         <option value="completed">Walk-in/Completed</option>
                     `;
+<<<<<<< HEAD
                     // Show payment method filter
                     if (paymentMethodFilter) {
                         paymentMethodFilter.style.display = '';
                     }
                 } else if (tab === 'returns') {
                     // Show returns filter options
+=======
+                    if (paymentMethodFilter) paymentMethodFilter.style.display = '';
+                } else if (tab === 'returns') {
+>>>>>>> restore_from_6h
                     orderStatusFilter.innerHTML = `
                         <option value="all">All Returns</option>
                         <option value="pending_review">Pending Review</option>
@@ -3572,6 +3604,7 @@
                         <option value="rejected">Rejected</option>
                         <option value="completed">Completed</option>
                     `;
+<<<<<<< HEAD
                     // Hide payment method filter for returns
                     if (paymentMethodFilter) {
                         paymentMethodFilter.style.display = 'none';
@@ -3579,6 +3612,10 @@
                 }
                 
                 // Reset to 'all' when switching tabs
+=======
+                    if (paymentMethodFilter) paymentMethodFilter.style.display = 'none';
+                }
+>>>>>>> restore_from_6h
                 orderStatusFilter.value = 'all';
             }
 

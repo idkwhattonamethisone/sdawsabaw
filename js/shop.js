@@ -609,6 +609,9 @@ function updateTopLoginBtn() {
             const username = currentUser.email.split('@')[0];
             topLoginBtn.textContent = username;
             if (userDropdown) userDropdown.style.display = 'none';
+        } else {
+            topLoginBtn.textContent = 'Login';
+            if (userDropdown) userDropdown.style.display = 'none';
         }
     } else {
         topLoginBtn.textContent = 'Login';

@@ -77,18 +77,25 @@ class FormValidator {
 
             // Password
             password: {
-                minLength: 6,
-                maxLength: 60,
+                minLength: 7,
+                maxLength: 12,
+                // Keep strength patterns for UI; policy enforced via validate()
                 patterns: {
                     weak: /^.{1,5}$/,
                     fair: /^(?=.*[a-z]).{6,}$/,
                     good: /^(?=.*[a-z])(?=.*[A-Z]).{8,}$/,
                     strong: /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&]).{8,}$/
                 },
+                // Enforce policy: 7–12 chars, include a digit, an uppercase, and one of . or !
+                validate: (value) => {
+                    const policy = /^(?=.{7,12}$)(?=.*\d)(?=.*[A-Z])(?=.*[\.!]).*$/;
+                    return policy.test(value);
+                },
                 errorMessages: {
                     empty: 'Password is required',
-                    minLength: 'Password must be at least 6 characters',
-                    maxLength: 'Password must be less than 60 characters'
+                    minLength: 'Password must be 7–12 characters',
+                    maxLength: 'Password must be 7–12 characters',
+                    validate: 'Password must be 7–12 chars and include a number, an uppercase letter, and one of . or !'
                 }
             },
 
@@ -581,6 +588,30 @@ class FormValidator {
 
         if (!fullNameInput || !emailInput || !passwordInput || !confirmPasswordInput) {
             return; // Elements not found on this page
+        }
+
+        // Ensure password policy hint is present (global across pages/modals)
+        try {
+            const existingHint = document.getElementById('password-policy-hint');
+            if (!existingHint) {
+                const hint = document.createElement('small');
+                hint.id = 'password-policy-hint';
+                hint.style.display = 'block';
+                hint.style.color = '#7f8c8d';
+                hint.style.marginTop = '6px';
+                hint.textContent = '12–16 characters, include a number, an uppercase letter, and one of . or !';
+
+                // Insert after password strength block if available, otherwise after the input
+                const formGroup = passwordInput.closest('.form-group');
+                const strengthBlock = formGroup ? formGroup.querySelector('.password-strength') : null;
+                if (strengthBlock && strengthBlock.parentNode) {
+                    strengthBlock.parentNode.insertBefore(hint, strengthBlock.nextSibling);
+                } else if (passwordInput.parentNode) {
+                    passwordInput.parentNode.insertBefore(hint, passwordInput.nextSibling);
+                }
+            }
+        } catch (e) {
+            // no-op on failure to inject hint
         }
 
         // Full Name validation with real-time feedback

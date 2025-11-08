@@ -1,5 +1,5 @@
 const express = require('express');
-const { MongoClient } = require('mongodb');
+const { MongoClient, ObjectId } = require('mongodb');
 const cors = require('cors');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
@@ -1286,16 +1286,28 @@ app.post('/api/staff/login', async (req, res) => {
 app.post('/api/user-addresses', async (req, res) => {
     try {
         const { userId, email, addressData } = req.body;
+<<<<<<< HEAD
         if (!addressData) {
             return res.status(400).json({ error: 'Missing addressData' });
         }
         if (!userId && !email) {
             return res.status(400).json({ error: 'Missing userId or email' });
+=======
+        
+        // Support both userId and email for address association
+        if (!addressData) {
+            return res.status(400).json({ success: false, error: 'Missing addressData' });
+        }
+        
+        if (!userId && !email) {
+            return res.status(400).json({ success: false, error: 'Missing userId or email' });
+>>>>>>> restore_from_6h
         }
         
         const database = client.db('MyProductsDb');
         const collection = database.collection('UserAddresses');
 
+<<<<<<< HEAD
         // Build query for finding existing addresses to unset default
         const userQuery = {};
         if (userId) {
@@ -1310,21 +1322,35 @@ app.post('/api/user-addresses', async (req, res) => {
             userQuery.email = email;
         }
 
+=======
+        console.log('📮 Saving address to database: MyProductsDb, collection: UserAddresses');
+        console.log('📮 User identifier:', { userId, email });
+
+        // Build query to find user's addresses (support both userId and email)
+        const userQuery = userId ? { userId } : { email };
+        
+>>>>>>> restore_from_6h
         // If this address is set as default, unset all others for this user
         if (addressData.isDefault) {
+            console.log('📮 Unsetting other default addresses for user');
             await collection.updateMany(
                 { ...userQuery, isDefault: true },
                 { $set: { isDefault: false } }
             );
         }
 
+<<<<<<< HEAD
         // Build document - include userId if provided, email if provided
+=======
+        // Build document to save - include both userId and email if available
+>>>>>>> restore_from_6h
         const doc = {
             ...addressData,
             createdAt: new Date(),
             updatedAt: new Date()
         };
         
+<<<<<<< HEAD
         if (userId) {
             // Convert userId to number if possible
             if (!isNaN(userId)) {
@@ -1336,21 +1362,37 @@ app.post('/api/user-addresses', async (req, res) => {
         if (email) {
             doc.email = email;
         }
+=======
+        // Add userId and/or email to the document
+        if (userId) doc.userId = userId;
+        if (email) doc.email = email;
+        
+        console.log('📮 Document to save:', JSON.stringify(doc, null, 2));
+>>>>>>> restore_from_6h
         
         const result = await collection.insertOne(doc);
+        console.log('✅ Address saved successfully! Inserted ID:', result.insertedId);
+        console.log('📮 Database: MyProductsDb, Collection: UserAddresses');
+        
         res.json({ success: true, message: 'Address saved successfully', addressId: result.insertedId });
     } catch (error) {
         console.error('Error saving user address:', error);
-        res.status(500).json({ error: 'Failed to save address' });
+        res.status(500).json({ success: false, error: 'Failed to save address' });
     }
 });
 
-// API endpoint to get user addresses by userId
+// API endpoint to get user addresses by userId or email
 app.get('/api/user-addresses', async (req, res) => {
     try {
+<<<<<<< HEAD
         let { userId, email } = req.query;
         
         // Support both userId and email lookup
+=======
+        const { userId, email } = req.query;
+        
+        // Support both userId and email for address lookup
+>>>>>>> restore_from_6h
         if (!userId && !email) {
             return res.status(400).json({ error: 'Missing userId or email' });
         }
@@ -1359,6 +1401,7 @@ app.get('/api/user-addresses', async (req, res) => {
         const collection = database.collection('UserAddresses');
         
         // Build query - support both userId and email
+<<<<<<< HEAD
         const query = {};
         if (userId) {
             // Convert userId to number if possible
@@ -1369,6 +1412,13 @@ app.get('/api/user-addresses', async (req, res) => {
             }
         }
         if (email) {
+=======
+        let query = {};
+        if (userId) {
+            // Convert userId to number if possible
+            query.userId = !isNaN(userId) ? Number(userId) : userId;
+        } else if (email) {
+>>>>>>> restore_from_6h
             query.email = email;
         }
         
@@ -1380,34 +1430,91 @@ app.get('/api/user-addresses', async (req, res) => {
     }
 });
 
+// API endpoint to delete a user address
+app.delete('/api/user-addresses/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const database = client.db('MyProductsDb');
+        const collection = database.collection('UserAddresses');
+        
+        console.log('🗑️ Deleting address with id:', id);
+        
+        // Try to find address by id field first (custom id like "addr_...")
+        let address = await collection.findOne({ id });
+        
+        // If not found by id, try by _id (in case the id passed is actually a MongoDB ObjectId)
+        if (!address && id.match(/^[0-9a-fA-F]{24}$/)) {
+            try {
+                address = await collection.findOne({ _id: new ObjectId(id) });
+            } catch (err) {
+                // Invalid ObjectId format, continue
+            }
+        }
+        
+        if (!address) {
+            console.log('❌ Address not found with id:', id);
+            return res.status(404).json({ success: false, error: 'Address not found' });
+        }
+        
+        // Delete the address using _id (MongoDB's primary key)
+        const result = await collection.deleteOne({ _id: address._id });
+        
+        if (result.deletedCount === 0) {
+            return res.status(404).json({ success: false, error: 'Address not found' });
+        }
+        
+        console.log('✅ Address deleted successfully:', id);
+        res.json({ success: true, message: 'Address deleted successfully' });
+    } catch (error) {
+        console.error('Error deleting user address:', error);
+        res.status(500).json({ success: false, error: 'Failed to delete address' });
+    }
+});
+
 // API endpoint to set an address as default
 app.put('/api/user-addresses/:id/default', async (req, res) => {
     try {
         const { id } = req.params;
         const database = client.db('MyProductsDb');
         const collection = database.collection('UserAddresses');
-        const address = await collection.findOne({ id });
-
-        if (!address) {
-            return res.status(404).json({ error: 'Address not found' });
+        
+        // Try to find address by id field first (custom id like "addr_...")
+        let address = await collection.findOne({ id });
+        
+        // If not found by id, try by _id (in case the id passed is actually a MongoDB ObjectId)
+        if (!address && id.match(/^[0-9a-fA-F]{24}$/)) {
+            try {
+                address = await collection.findOne({ _id: new ObjectId(id) });
+            } catch (err) {
+                // Invalid ObjectId format, continue
+            }
         }
+        
+        if (!address) {
+            return res.status(404).json({ success: false, error: 'Address not found' });
+        }
+
+        // Build query to find user's other addresses (support both userId and email)
+        const userQuery = {};
+        if (address.userId) userQuery.userId = address.userId;
+        if (address.email) userQuery.email = address.email;
 
         // Unset all other defaults for this user
         await collection.updateMany(
-            { userId: address.userId, isDefault: true },
+            { ...userQuery, isDefault: true },
             { $set: { isDefault: false } }
         );
 
-        // Set this address as default
+        // Set this address as default (use _id for the update)
         await collection.updateOne(
-            { id },
+            { _id: address._id },
             { $set: { isDefault: true } }
         );
 
         res.json({ success: true, message: 'Default address updated' });
     } catch (error) {
         console.error('Error updating default address:', error);
-        res.status(500).json({ error: 'Failed to update default address' });
+        res.status(500).json({ success: false, error: 'Failed to update default address' });
     }
 });
 
@@ -1691,7 +1798,11 @@ app.get('/api/orders/walkin/stats', async (req, res) => {
     }
 });
 
+<<<<<<< HEAD
 // NOTE: Duplicate endpoint removed - using the one at line 1318 that supports both userId and email
+=======
+// Duplicate endpoint removed - using the one above that supports both userId and email
+>>>>>>> restore_from_6h
 
 // API endpoint for comprehensive staff dashboard statistics
 app.get('/api/orders/stats/comprehensive', async (req, res) => {
@@ -2999,6 +3110,14 @@ app.post('/api/auth/complete-registration', async (req, res) => {
             return res.status(400).json({ 
                 success: false, 
                 message: 'All fields are required' 
+            });
+        }
+        // Enforce password policy: 7–12 chars, include a digit, an uppercase, and one of . or !
+        const passwordPolicy = /^(?=.{7,12}$)(?=.*\d)(?=.*[A-Z])(?=.*[\.!]).*$/;
+        if (!passwordPolicy.test(String(password))) {
+            return res.status(400).json({
+                success: false,
+                message: 'Password must be 7–12 chars and include a number, an uppercase letter, and one of . or !'
             });
         }
         

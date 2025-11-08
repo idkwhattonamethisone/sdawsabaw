@@ -1,0 +1,28 @@
+# Production Environment Variables
+# Copy this to .env for production use
+
+# Strong JWT Secret (generate a new one for production)
+JWT_SECRET=your-super-secure-jwt-secret-key-here-change-this-in-production-123456789012345678901234567890
+
+# Better Auth Configuration
+BETTER_AUTH_SECRET=your-32-character-secret-key-here-123456789
+BETTER_AUTH_URL=http://localhost:3000
+
+# Email Configuration
+SENDER_EMAIL=sanricomercantileofficial@gmail.com
+N8N_WEBHOOK_URL=http://localhost:5678/webhook/send-verification-email
+
+# Database Configuration
+DATABASE_URL=./database.db
+
+# MongoDB Connection (keep your existing connection)
+MONGODB_URI=mongodb+srv://24uglyandrew:weaklings162@sanricofree.tesbmqx.mongodb.net/
+
+# Security Settings
+BCRYPT_ROUNDS=12
+SESSION_TIMEOUT=604800000
+MAX_LOGIN_ATTEMPTS=5
+LOCKOUT_DURATION=900000
+
+# CORS Settings
+ALLOWED_ORIGINS=http://localhost:3000,http://localhost:3001

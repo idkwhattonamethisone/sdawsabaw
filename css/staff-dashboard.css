@@ -1,3 +1,14 @@
+/* Ensure tab content is actually visible when set to display:block inline */
+#ordersTabContent[style*="display: block"],
+#returnsTabContent[style*="display: block"],
+#ordersTabContent[style*="display:block"],
+#returnsTabContent[style*="display:block"] {
+  display: block !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  height: auto !important;
+  min-height: auto !important;
+}
 :root {
   --bg: #f8f9fa;
   --card-bg: #ffffff;
@@ -1178,11 +1189,20 @@ select.form-control:focus {
 .walkin-orders-table-container {
   background: var(--card-bg);
   border-radius: 0 0 var(--border-radius) var(--border-radius);
+<<<<<<< HEAD
   padding: 0 1.5rem 1.5rem 1.5rem;
   padding-top: 0 !important;
   box-shadow: 0 4px 12px var(--shadow);
   border: 1px solid var(--input-border);
   border-top: none;
+=======
+  padding: 1.5rem;
+  box-shadow: 0 4px 12px var(--shadow);
+  border: 1px solid var(--input-border);
+  border-top: none;
+  margin-top: 0 !important;
+  padding-top: 0 !important;
+>>>>>>> restore_from_6h
   overflow-x: auto;
   margin-bottom: 2rem;
   margin-top: 0 !important;
@@ -2618,12 +2638,16 @@ select.form-control:focus {
     grid-template-columns: repeat(2, 1fr);
   }
 
-  .orders-table-container,
-  .products-table-container {
-    overflow-x: auto;
-    max-width: 100vw;
-    -webkit-overflow-scrolling: touch;
-  }
+.orders-table-container,
+.products-table-container {
+  overflow-x: auto;
+  max-width: 100vw;
+  -webkit-overflow-scrolling: touch;
+  border-top: none;
+  margin-top: 0 !important;
+  padding-top: 0 !important;
+  border-radius: 0 0 var(--border-radius) var(--border-radius);
+}
 
   .orders-table th,
   .orders-table td,
