@@ -353,7 +353,7 @@
             cursor: not-allowed;
         }
         
-        /* Loading spinner */
+        /* Button-sized spinner (used in modal buttons) */
         .loading-spinner {
             display: inline-block;
             width: 16px;
@@ -363,6 +363,29 @@
             border-radius: 50%;
             animation: spin 1s linear infinite;
             margin-right: 0.5rem;
+        }
+
+        /* Page loader for addresses grid */
+        .addresses-loading {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 300px;
+            width: 100%;
+            padding: 2rem;
+            color: #666;
+            text-align: center;
+            grid-column: 1 / -1;
+        }
+        .addresses-loading .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #e63946;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 1rem;
         }
         
         @keyframes spin {
@@ -647,30 +670,76 @@
         // Initialize addresses
         async function initializeAddresses() {
             try {
+                // Show page loader while fetching
+                showLoadingAddresses();
                 userAddresses = await loadUserAddresses();
                 renderAddresses();
+                hideLoadingAddresses();
             } catch (error) {
                 console.error('Error loading addresses:', error);
                 showToast('Failed to load addresses', 'error');
                 userAddresses = [];
                 renderAddresses();
+                hideLoadingAddresses();
             }
         }
 
-        // Load user addresses from database/storage
+        // Page loader helpers for addresses grid
+        function showLoadingAddresses() {
+            const grid = document.getElementById('addressesGrid');
+            if (grid) {
+                grid.innerHTML = `
+                    <div class="addresses-loading">
+                        <div class="spinner"></div>
+                        <p>Loading addresses...</p>
+                    </div>
+                `;
+            }
+        }
+        function hideLoadingAddresses() {
+            // Hidden by render when grid is populated
+        }
+
+        // Load user addresses from MongoDB only (no localStorage)
         async function loadUserAddresses() {
             try {
-                // Fetch from backend API instead of localStorage
-                const response = await fetch('http://localhost:3000/api/user-addresses?userId=' + encodeURIComponent(currentUser.id));
-                if (!response.ok) throw new Error('Failed to fetch addresses from server');
+                // Fetch from MongoDB via API using email
+                const email = currentUser && currentUser.email;
+                if (!email) {
+                    console.error('User email not found');
+                    throw new Error('User email not found');
+                }
+                
+                console.log('📮 Loading addresses from MongoDB for email:', email);
+                const response = await fetch('http://localhost:3000/api/user-addresses?email=' + encodeURIComponent(email));
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error('Failed to fetch addresses from MongoDB:', response.status, errorText);
+                    throw new Error('Failed to fetch addresses from server');
+                }
+                
                 const addresses = await response.json();
+                console.log('📮 Loaded', addresses.length, 'addresses from MongoDB');
+                
                 // Map _id to id for frontend compatibility
-                return addresses.map(addr => ({
+                const mappedAddresses = addresses.map(addr => ({
                     ...addr,
                     id: addr.id || addr._id // Use id if present, else _id
                 }));
+                
+                // Sort: default addresses first, then by creation date (newest first)
+                mappedAddresses.sort((a, b) => {
+                    if (a.isDefault === b.isDefault) {
+                        return new Date(b.createdAt || b.updatedAt || 0) - new Date(a.createdAt || a.updatedAt || 0);
+                    }
+                    return b.isDefault - a.isDefault; // Default addresses first
+                });
+                
+                return mappedAddresses;
             } catch (error) {
-                console.error('Error loading addresses from server:', error);
+                console.error('Error loading addresses from MongoDB:', error);
+                showToast('Failed to load addresses from database', 'error');
                 return [];
             }
         }
@@ -775,6 +844,7 @@
                 return;
             }
             try {
+                showLoadingAddresses();
                 const response = await fetch('http://localhost:3000/api/user-addresses/' + encodeURIComponent(addressId), {
                     method: 'DELETE'
                 });
@@ -784,12 +854,14 @@
             } catch (error) {
                 console.error('Error deleting address:', error);
                 showToast('Failed to delete address', 'error');
+                hideLoadingAddresses();
             }
         }
 
         // Toggle default address via API
         async function toggleDefault(addressId) {
             try {
+                showLoadingAddresses();
                 const response = await fetch('http://localhost:3000/api/user-addresses/' + encodeURIComponent(addressId) + '/default', {
                     method: 'PUT'
                 });
@@ -799,6 +871,7 @@
             } catch (error) {
                 console.error('Error updating default address:', error);
                 showToast('Failed to update default address', 'error');
+                hideLoadingAddresses();
             }
         }
 

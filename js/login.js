@@ -192,9 +192,12 @@ document.addEventListener('DOMContentLoaded', () => {
             if (currentUser && currentUser.fullName) {
                 topLoginBtn.textContent = currentUser.fullName;
                 if (userDropdown) userDropdown.style.display = 'none';
-            } else if (currentUser && currentUser.email && currentUser.email.endsWith('@gmail.com')) {
+            } else if (currentUser && currentUser.email) {
                 const username = currentUser.email.split('@')[0];
                 topLoginBtn.textContent = username;
+                if (userDropdown) userDropdown.style.display = 'none';
+            } else {
+                topLoginBtn.textContent = 'Login';
                 if (userDropdown) userDropdown.style.display = 'none';
             }
         } else {
@@ -202,6 +205,8 @@ document.addEventListener('DOMContentLoaded', () => {
             if (userDropdown) userDropdown.style.display = 'none';
         }
     }
+    // expose globally for reuse
+    window.updateTopLoginBtn = updateTopLoginBtn;
     updateTopLoginBtn();
 
     // Set up cart button click handler
@@ -593,22 +598,28 @@ function handleGoogleSignIn(response) {
         console.log('Google user data:', payload);
         
         const userData = {
-            id: payload.sub,
+            id: payload.sub || payload.email,
             email: payload.email,
             fullName: payload.name,
+            username: (payload.email || '').split('@')[0],
             firstName: payload.given_name,
             lastName: payload.family_name,
             profilePicture: payload.picture,
             provider: 'google',
             isStaff: false
         };
-        
-        const isNewUser = !Auth.userExists(userData.id);
-        console.log('Is new user:', isNewUser);
-        
-        const result = Auth.login(userData);
-        
-        if (result.success) {
+
+        // Persist as current user (align with manual login header logic)
+        if (typeof Auth !== 'undefined' && typeof Auth.setCurrentUser === 'function') {
+            Auth.setCurrentUser(userData);
+        } else {
+            try { localStorage.setItem('currentUser', JSON.stringify(userData)); } catch (_) {}
+        }
+
+        // Broadcast login for any listeners
+        try { window.dispatchEvent(new CustomEvent('auth:login', { detail: { user: userData } })); } catch (_) {}
+
+        {
                     if (window.LoadingUtils) {
                         window.LoadingUtils.updateText('Signing you in...');
                     }
@@ -620,25 +631,28 @@ function handleGoogleSignIn(response) {
                 loginModal.classList.remove('show');
             }
             
-            Auth.updateUIAfterLogin();
+            if (typeof updateAccountButton === 'function') {
+                try { updateAccountButton(); } catch (_) {}
+            } else if (typeof Auth !== 'undefined' && typeof Auth.updateUIAfterLogin === 'function') {
+                Auth.updateUIAfterLogin();
+            }
             
             setTimeout(() => {
-                if (typeof hasAddresses === 'function' && typeof showAddressModal === 'function') {
-                    const userHasAddresses = hasAddresses();
-                    
-                    if (isNewUser || !userHasAddresses) {
-                        showAddressModal(true);
-                        if (window.LoadingUtils) window.LoadingUtils.hide();
-                    } else {
-                        if (window.LoadingUtils) window.LoadingUtils.hide();
-                    }
-                } else {
+                const tryShowAddress = async () => {
+                    try {
+                        if (typeof window.AddressModal !== 'undefined' && typeof window.AddressModal.userHasAddressesAsync === 'function') {
+                            const has = await window.AddressModal.userHasAddressesAsync();
+                            if (!has && typeof showAddressModal === 'function') {
+                                showAddressModal(true);
+                            }
+                        } else if (typeof hasAddresses === 'function' && !hasAddresses() && typeof showAddressModal === 'function') {
+                            showAddressModal(true);
+                        }
+                    } catch (_) {}
                     if (window.LoadingUtils) window.LoadingUtils.hide();
-                }
+                };
+                tryShowAddress();
             }, 1000);
-        } else {
-            showToast(result.message, 'error');
-            if (window.LoadingUtils) window.LoadingUtils.hide();
         }
     } catch (error) {
         console.error('Error processing Google Sign-In:', error);
@@ -1100,8 +1114,46 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
         
         if (result.success) {
-                    // Store auth token
+                    // Store auth token and user for global use
                     localStorage.setItem('auth_token', result.token);
+                    if (typeof Auth !== 'undefined' && typeof Auth.setCurrentUser === 'function') {
+                        Auth.setCurrentUser({
+                            id: result.user.id,
+                            fullName: result.user.fullName,
+                            email: result.user.email,
+                            username: (result.user.email || '').split('@')[0],
+                            isStaff: !!result.user.isStaff
+                        });
+                    } else {
+                        try { localStorage.setItem('currentUser', JSON.stringify(result.user)); } catch (_) {}
+                    }
+                    if (typeof window !== 'undefined') {
+                        window.isAuthenticated = true;
+                        try { window.dispatchEvent(new CustomEvent('auth:login', { detail: { user: result.user } })); } catch (_) {}
+                        if (typeof updateAccountButton === 'function') {
+                            try { updateAccountButton(); } catch (_) {}
+                        }
+                        // Update login button text using fullName from database
+                        if (typeof window.updateTopLoginBtn === 'function') {
+                            try { window.updateTopLoginBtn(); } catch (_) {}
+                        }
+                        // Fallback: directly update topLoginBtn if present
+                        try {
+                            const topBtn = document.getElementById('topLoginBtn');
+                            if (topBtn && result.user) {
+                                // Prioritize fullName from database over username/email
+                                const displayName = (result.user.fullName || (result.user.email || '').split('@')[0]) || 'Account';
+                                topBtn.textContent = displayName;
+                                topBtn.onclick = () => {
+                                    if (result.user.isStaff) {
+                                        window.location.href = 'staff-dashboard.html';
+                                    } else {
+                                        window.location.href = 'profile.html';
+                                    }
+                                };
+                            }
+                        } catch (_) {}
+                    }
 
                     showToast(`Login successful! Welcome back, ${result.user.fullName || result.user.email}!`, 'success');
             
@@ -1121,6 +1173,10 @@ document.addEventListener('DOMContentLoaded', () => {
                             if (typeof showAddressModal === 'function') {
                                 showAddressModal(true);
                                 if (window.LoadingUtils) window.LoadingUtils.hide();
+                            }
+                            // Optionally refresh header/account UI
+                            if (typeof window.refreshAccountUI === 'function') {
+                                window.refreshAccountUI(result.user);
                             }
                         }
                     }, 1000);

@@ -85,6 +85,13 @@ app.post('/api/simple-auth/register', async (req, res) => {
         if (!email || !password || !fullName) {
             return res.status(400).json({ error: 'All fields are required' });
         }
+        // Enforce password policy: 7–12 chars, include a digit, an uppercase, and one of . or !
+        const passwordPolicy = /^(?=.{7,12}$)(?=.*\d)(?=.*[A-Z])(?=.*[\.!]).*$/;
+        if (!passwordPolicy.test(String(password))) {
+            return res.status(400).json({ 
+                error: 'Password must be 7–12 chars and include a number, an uppercase letter, and one of . or !'
+            });
+        }
         
         // Check if user exists
         const existingUser = await db.collection('UserCredentials').findOne({ email });

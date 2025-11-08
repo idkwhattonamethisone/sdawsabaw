@@ -1891,11 +1891,8 @@
 
         // Initialize staff system with retry mechanism to ensure localStorage is ready
         function initializeStaffDashboard() {
-            // Show loading screen immediately
+            // Transition dashboard loading overlay disabled
             const dashboardLoading = document.getElementById('dashboardLoading');
-            if (dashboardLoading) {
-                dashboardLoading.classList.add('show');
-            }
             
             let attempts = 0;
             const maxAttempts = 10;
@@ -2719,7 +2716,8 @@
                     // Update tab badges
                     const ordersTabBadge = document.getElementById('ordersTabBadge');
                     if (ordersTabBadge) {
-                        ordersTabBadge.textContent = pendingOrders;
+                        const totalOrders = Array.isArray(this.orders) ? this.orders.length : 0;
+                        ordersTabBadge.textContent = totalOrders;
                     }
 
                     this.checkForNewOrders();
@@ -2768,11 +2766,12 @@
                     const ordersTabBadge = document.getElementById('ordersTabBadge');
                     const returnsTabBadge = document.getElementById('returnsTabBadge');
                     if (ordersTabBadge) {
-                        const pendingOrders = this.orders ? this.orders.filter(o => o.collection === 'pending').length : 0;
-                        ordersTabBadge.textContent = pendingOrders;
+                        const totalOrders = Array.isArray(this.orders) ? this.orders.length : 0;
+                        ordersTabBadge.textContent = totalOrders;
                     }
                     if (returnsTabBadge) {
-                        returnsTabBadge.textContent = pendingReturns;
+                        const totalReturns = Array.isArray(this.returns) ? this.returns.length : 0;
+                        returnsTabBadge.textContent = totalReturns;
                     }
 
                 } catch (error) {
@@ -3513,6 +3512,11 @@
                 }
 
                 // Render the appropriate content
+                // Update filter options to match active tab
+                if (typeof this.updateFiltersForTab === 'function') {
+                    this.updateFiltersForTab(tab);
+                }
+
                 if (tab === 'orders') {
                     console.log('🔄 Rendering orders...');
                     console.log('📊 Orders data before render:', this.orders);
@@ -3522,6 +3526,35 @@
                     console.log('📦 Returns data before render:', this.returns);
                     this.renderReturns();
                 }
+            }
+
+            // Dynamically update status/payment filters per active tab
+            updateFiltersForTab(tab) {
+                const orderStatusFilter = document.getElementById('orderStatusFilter');
+                const paymentMethodFilter = document.getElementById('paymentMethodFilter');
+                if (!orderStatusFilter) return;
+                if (tab === 'orders') {
+                    orderStatusFilter.innerHTML = `
+                        <option value="all">All Orders</option>
+                        <option value="pending">Pending</option>
+                        <option value="approved">Approved</option>
+                        <option value="delivered">Delivered</option>
+                        <option value="returned">Returned</option>
+                        <option value="cancelled">Cancelled</option>
+                        <option value="completed">Walk-in/Completed</option>
+                    `;
+                    if (paymentMethodFilter) paymentMethodFilter.style.display = '';
+                } else if (tab === 'returns') {
+                    orderStatusFilter.innerHTML = `
+                        <option value="all">All Returns</option>
+                        <option value="pending_review">Pending Review</option>
+                        <option value="approved">Approved</option>
+                        <option value="rejected">Rejected</option>
+                        <option value="completed">Completed</option>
+                    `;
+                    if (paymentMethodFilter) paymentMethodFilter.style.display = 'none';
+                }
+                orderStatusFilter.value = 'all';
             }
 
             renderCurrentSection() {

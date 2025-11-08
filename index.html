@@ -159,28 +159,7 @@
         window.addEventListener('load', function(){ setTimeout(runBrandAnimation, 50); }, { once: true });
       })();
     </script>
-    <script>
-        // Show a first-load spinner overlay for the index page
-        (function() {
-            if (window.LoadingUtils) {
-                var shownAt = Date.now();
-                window.LoadingUtils.show('LOADING');
-                var onLoadHide = function(){
-                    var elapsed = Date.now() - shownAt;
-                    var remaining = Math.max(0, 200 - elapsed);
-                    setTimeout(function(){ window.LoadingUtils.hide(); }, remaining);
-                };
-                if (document.readyState === 'complete') onLoadHide();
-                else window.addEventListener('load', onLoadHide);
-            } else {
-                // Fallback if LoadingUtils not yet defined
-                window.addEventListener('load', function(){
-                    var overlay = document.getElementById('loadingOverlay');
-                    if (overlay) overlay.classList.remove('show');
-                });
-            }
-        })();
-    </script>
+     
     <script src="js/shop.js"></script>
     <script src="js/stockDisplay.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/2.0.2/anime.min.js"></script>
@@ -1078,6 +1057,7 @@
                             </div>
                             <div class="strength-text"></div>
                         </div>
+                    <small id="password-policy-hint" style="display:block;color:#7f8c8d;margin-top:6px;">7–12 characters, include a number, an uppercase letter, and one of . or !</small>
                         <div class="error-message"></div>
                         <div class="success-message"></div>
                     </div>

@@ -20,7 +20,7 @@ async function debugApiVsDatabase() {
     
     // Test 2: Direct MongoDB access (same as API)
     console.log('💾 Test 2: Direct MongoDB query (same as server code)...');
-    const uri = "mongodb+srv://24uglyandrew:weaklings162@sanricosite.vgnc0qj.mongodb.net/";
+const uri = "mongodb+srv://24uglyandrew:weaklings162@sanricofree.tesbmqx.mongodb.net/";
     const client = new MongoClient(uri);
     
     try {

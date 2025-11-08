@@ -479,9 +479,12 @@ function updateTopLoginBtn() {
         if (currentUser && currentUser.fullName) {
             topLoginBtn.textContent = currentUser.fullName;
             if (userDropdown) userDropdown.style.display = 'none';
-        } else if (currentUser && currentUser.email && currentUser.email.endsWith('@gmail.com')) {
+        } else if (currentUser && currentUser.email) {
             const username = currentUser.email.split('@')[0];
             topLoginBtn.textContent = username;
+            if (userDropdown) userDropdown.style.display = 'none';
+        } else {
+            topLoginBtn.textContent = 'Login';
             if (userDropdown) userDropdown.style.display = 'none';
         }
     } else {

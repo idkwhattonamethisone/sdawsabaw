@@ -309,7 +309,7 @@ class AddressModalManager {
     }
 
     // Show the modal
-    show(isPostLogin = false) {
+    async show(isPostLogin = false) {
         console.log('AddressModal.show() called with isPostLogin:', isPostLogin);
         this.init();
         const modal = document.getElementById('addressModal');
@@ -324,10 +324,21 @@ class AddressModalManager {
         
         if (isPostLogin) {
             title.textContent = 'Add Your First Address';
-            // Check if user already has addresses (skip if they do)
-            if (this.userHasAddresses()) {
-                console.log('User already has addresses, skipping modal display');
-                return; // Don't show modal if user already has addresses
+            // Safety: ensure logged-in user exists
+            const currentUser = Auth.getCurrentUser();
+            if (!currentUser || (!currentUser.email && !currentUser.id)) {
+                console.log('User not logged in, skipping address modal');
+                return;
+            }
+            // Server-side check if user already has addresses
+            try {
+                const has = await this.userHasAddressesAsync();
+                if (has) {
+                    console.log('User already has addresses, skipping modal display');
+                    return;
+                }
+            } catch (err) {
+                console.warn('userHasAddressesAsync failed, proceeding to show modal');
             }
         } else {
             title.textContent = 'Add Address';
@@ -382,6 +393,10 @@ class AddressModalManager {
             // Show loading state
             submitBtn.disabled = true;
             btnText.innerHTML = '<span class="loading-spinner"></span>Saving...';
+            // Force a paint so spinner becomes visible before heavy work
+            await new Promise(resolve => {
+                requestAnimationFrame(() => requestAnimationFrame(resolve));
+            });
             
             const currentUser = Auth.getCurrentUser();
             const addressData = {
@@ -399,50 +414,51 @@ class AddressModalManager {
             };
             console.log('DEBUG: addressData to save:', addressData);
 
-            // Validate required fields using SecurityValidator
+            // Validate required fields (basic inline validation)
             const requiredFields = ['label', 'streetAddress', 'barangay', 'city', 'postalCode', 'province'];
             for (const field of requiredFields) {
                 if (!addressData[field]) {
                     throw new Error(`${field.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())} is required`);
                 }
             }
-
-            // Enhanced validation using SecurityValidator
-            const labelValidation = SecurityValidator.validateFullName(addressData.label);
-            if (!labelValidation.valid) {
-                throw new Error(labelValidation.message);
+            // Enhanced validation rules
+            if (addressData.label.length < 2 || addressData.label.length > 50) {
+                throw new Error('Address label must be between 2 and 50 characters');
             }
-
-            const streetValidation = SecurityValidator.validateSearchQuery(addressData.streetAddress);
-            if (!streetValidation.valid) {
-                throw new Error('Invalid street address format');
+            if (addressData.streetAddress.length < 5 || addressData.streetAddress.length > 200) {
+                throw new Error('Street address must be between 5 and 200 characters');
             }
-
-            const barangayValidation = SecurityValidator.validateSearchQuery(addressData.barangay);
-            if (!barangayValidation.valid) {
-                throw new Error('Invalid barangay format');
+            if (addressData.barangay.length < 2 || addressData.barangay.length > 100) {
+                throw new Error('Barangay must be between 2 and 100 characters');
             }
-
-            const cityValidation = SecurityValidator.validateSearchQuery(addressData.city);
-            if (!cityValidation.valid) {
-                throw new Error('Invalid city format');
+            if (addressData.city.length < 2 || addressData.city.length > 100) {
+                throw new Error('City must be between 2 and 100 characters');
             }
-
-            const provinceValidation = SecurityValidator.validateSearchQuery(addressData.province);
-            if (!provinceValidation.valid) {
-                throw new Error('Invalid province format');
+            if (addressData.province.length < 2 || addressData.province.length > 100) {
+                throw new Error('Province must be between 2 and 100 characters');
             }
-
-            const postalCodeValidation = SecurityValidator.validatePostalCode(addressData.postalCode);
-            if (!postalCodeValidation.valid) {
-                throw new Error(postalCodeValidation.message);
+            if (!/^\d{4}$/.test(addressData.postalCode)) {
+                throw new Error('Postal code must be exactly 4 digits');
             }
 
             // Save address
             await this.saveAddress(addressData);
             
+            // Delay slightly so spinner is perceived
+            await new Promise(resolve => setTimeout(resolve, 300));
             showToast('Address added successfully!', 'success');
             this.close();
+
+            // Refresh cached addresses by email for subsequent checks
+            try {
+                if (currentUser && currentUser.email) {
+                    const apiBaseUrl = 'http://localhost:3000';
+                    window.addressesPromise = fetch(`${apiBaseUrl}/api/user-addresses?email=${encodeURIComponent(currentUser.email)}`)
+                        .then(r => r.ok ? r.json() : [])
+                        .then(addresses => Array.isArray(addresses) ? addresses.map(a => ({ ...a, id: a.id || a._id })) : [])
+                        .catch(() => []);
+                }
+            } catch (_) {}
             
             // Call callback if provided
             if (this.onAddressSaved) {
@@ -451,11 +467,15 @@ class AddressModalManager {
             
         } catch (error) {
             console.error('Error saving address:', error);
-            showToast(error.message || 'Failed to save address', 'error');
+            // Keep spinner visible briefly before showing error
+            await new Promise(resolve => setTimeout(resolve, 300));
+            showToast(error.message || 'Failed to save address. Please check your input and try again.', 'error');
         } finally {
-            // Reset button state
-            submitBtn.disabled = false;
-            btnText.textContent = originalText;
+            // Reset button state after brief delay
+            setTimeout(() => {
+                submitBtn.disabled = false;
+                btnText.textContent = originalText;
+            }, 500);
         }
     }
 
@@ -471,34 +491,79 @@ class AddressModalManager {
             // Use the backend server URL for API requests
             const apiBaseUrl = 'http://localhost:3000'; // Change this if your backend runs elsewhere
             console.log('DEBUG: Sending fetch to ' + apiBaseUrl + '/api/user-addresses');
+            console.log('DEBUG: Current user:', { email: currentUser.email, id: currentUser.id });
+            
+            // Build request body - send both email and userId if available, server will handle it
+            const requestBody = { 
+                addressData: addressData
+            };
+            // Include both email and userId - server will use whichever is available
+            if (currentUser.email) requestBody.email = currentUser.email;
+            if (currentUser.id) requestBody.userId = currentUser.id;
+
+            console.log('DEBUG: Request body:', JSON.stringify(requestBody, null, 2));
+
             const response = await fetch(apiBaseUrl + '/api/user-addresses', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ userId: currentUser.id, addressData })
+                body: JSON.stringify(requestBody)
             });
+            
+            console.log('DEBUG: Response status:', response.status, response.statusText);
+            
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({ error: 'Failed to save address' }));
+                console.error('DEBUG: Error response:', errorData);
+                throw new Error(errorData.error || errorData.message || 'Failed to save address to server');
+            }
+            
             const result = await response.json();
-            console.log('DEBUG: Response from ' + apiBaseUrl + '/api/user-addresses:', result);
-            if (!response.ok || !result.success) {
-                throw new Error(result.error || 'Failed to save address to server');
+            console.log('DEBUG: Success response from ' + apiBaseUrl + '/api/user-addresses:', result);
+            
+            if (!result.success) {
+                throw new Error(result.error || result.message || 'Failed to save address to server');
+            }
+            
+            // Verify the address was actually saved by fetching it back
+            console.log('DEBUG: Verifying address was saved...');
+            const verifyResponse = await fetch(`${apiBaseUrl}/api/user-addresses?${currentUser.email ? `email=${encodeURIComponent(currentUser.email)}` : `userId=${encodeURIComponent(currentUser.id)}`}`);
+            if (verifyResponse.ok) {
+                const savedAddresses = await verifyResponse.json();
+                console.log('DEBUG: Verified - addresses in database:', savedAddresses.length);
             }
         } catch (error) {
             console.error('Error saving address to storage:', error);
+            console.error('Error details:', {
+                message: error.message,
+                stack: error.stack,
+                name: error.name
+            });
             throw error;
         }
     }
 
-    // Check if user has addresses
-    userHasAddresses() {
+    // Async check if user has addresses via API using email
+    async userHasAddressesAsync() {
         try {
             const currentUser = Auth.getCurrentUser();
-            if (!currentUser) return false;
-            
-            const stored = localStorage.getItem(`user_addresses_${currentUser.id}`);
-            const userAddresses = stored ? JSON.parse(stored) : [];
-            return userAddresses.length > 0;
+            if (!currentUser || (!currentUser.email && !currentUser.id)) return false;
+            const apiBaseUrl = 'http://localhost:3000';
+            const param = currentUser.email ? `email=${encodeURIComponent(currentUser.email)}` : `userId=${encodeURIComponent(currentUser.id)}`;
+            const response = await fetch(`${apiBaseUrl}/api/user-addresses?${param}`);
+            if (!response.ok) return false;
+            const addresses = await response.json();
+            return Array.isArray(addresses) && addresses.length > 0;
         } catch (error) {
+            console.error('Error checking addresses:', error);
             return false;
         }
+    }
+
+    // Check if user has addresses (deprecated - use userHasAddressesAsync instead)
+    userHasAddresses() {
+        // This method is deprecated - always returns false to force API check
+        // Use userHasAddressesAsync() instead for accurate results
+        return false;
     }
 
     // Generate unique ID

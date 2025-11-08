@@ -597,7 +597,11 @@ class Auth {
      */
     static async getUserAddressesFromDB(userId) {
         try {
-            const response = await fetch(`http://localhost:3000/api/user-addresses?userId=${userId}`);
+			// Prefer email-based lookup if available, fallback to userId
+			const currentUser = typeof Auth !== 'undefined' && typeof Auth.getCurrentUser === 'function' ? Auth.getCurrentUser() : null;
+			const email = currentUser && currentUser.email ? currentUser.email : null;
+			const queryParam = email ? `email=${encodeURIComponent(email)}` : `userId=${encodeURIComponent(userId)}`;
+			const response = await fetch(`http://localhost:3000/api/user-addresses?${queryParam}`);
             if (!response.ok) throw new Error('Failed to fetch addresses');
             let addresses = await response.json();
             // Sort: default first, then by createdAt

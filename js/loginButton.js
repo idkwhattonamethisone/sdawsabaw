@@ -23,23 +23,10 @@ class LoginButton {
         newBtn.id = 'topLoginBtn';
         newBtn.className = 'account-btn';
         newBtn.href = '#';
-
-        // Create profile icon span
-        const profileIcon = document.createElement('span');
-        profileIcon.className = 'profile-icon';
-        profileIcon.textContent = '👤';
-
-        // Create text span
+        
+        // Create text span (no icon)
         const textSpan = document.createElement('span');
         textSpan.className = 'login-text';
-
-        // Add hover events - these should work on all pages
-        newBtn.addEventListener('mouseenter', () => {
-            profileIcon.textContent = '👥';
-        });
-        newBtn.addEventListener('mouseleave', () => {
-            profileIcon.textContent = '👤';
-        });
 
         // Check login state
         const currentUser = Auth.getCurrentUser();
@@ -62,8 +49,7 @@ class LoginButton {
             };
         }
 
-        // Assemble button
-        newBtn.appendChild(profileIcon);
+        // Assemble button (text only)
         newBtn.appendChild(textSpan);
 
         // Replace old button
@@ -87,5 +73,12 @@ class LoginButton {
     }
 }
 
-// Initialize on page load
-new LoginButton(); 
+// Initialize on page load and keep a reference
+window.loginButtonInstance = new LoginButton();
+
+// Refresh on auth state changes
+window.addEventListener('auth:login', () => {
+    if (window.loginButtonInstance && typeof window.loginButtonInstance.init === 'function') {
+        try { window.loginButtonInstance.init(); } catch (_) {}
+    }
+});

@@ -1,7 +1,7 @@
 const { MongoClient } = require('mongodb');
 
 async function debugPendingOrders() {
-    const uri = "mongodb+srv://24uglyandrew:weaklings162@sanricosite.vgnc0qj.mongodb.net/";
+const uri = "mongodb+srv://24uglyandrew:weaklings162@sanricofree.tesbmqx.mongodb.net/";
     const client = new MongoClient(uri);
     
     try {
