@@ -581,6 +581,7 @@ app.post('/api/orders', async (req, res) => {
                 price_per_item: item.price || 0,
                 total_item_price: (item.price || 0) * (item.quantity || 1),
                 item_id: item.id || null,
+                item_image: item.image || null, // Include item image
                 category_bucket: item.categoryBucket || normalizeCategory(item.category),
                 category_original: item.categoryOriginal || item.category || 'unknown'
             })),
@@ -726,19 +727,42 @@ app.get('/api/orders/stats/staff-overview', async (req, res) => {
     }
 });
 
-// API endpoint to get orders statistics for a user
+// API endpoint to get orders statistics for a user (by userId, email, or fullName)
 app.get('/api/orders/stats/:userId', async (req, res) => {
     try {
         const userId = req.params.userId;
+        
+        // Get email and fullName from query parameters if provided
+        const { email, fullName } = req.query;
         
         // Handle both string and number userIds
         const userIdAsString = String(userId);
         const userIdAsNumber = isNaN(userId) ? null : Number(userId);
         
-        // Create query that searches for both string and number versions
-        const userQuery = userIdAsNumber !== null ? 
-            { $or: [{ userId: userIdAsString }, { userId: userIdAsNumber }] } :
-            { userId: userIdAsString };
+        // Build query that matches by userId, email, or fullName
+        const queryConditions = [];
+        
+        // Add userId conditions only if userId is not 'by-email' and is a valid identifier
+        if (userId !== 'by-email') {
+            if (userIdAsNumber !== null) {
+                queryConditions.push({ userId: userIdAsString }, { userId: userIdAsNumber });
+            } else {
+                queryConditions.push({ userId: userIdAsString });
+            }
+        }
+        
+        // Add email condition if provided
+        if (email) {
+            queryConditions.push({ email: email });
+        }
+        
+        // Add fullName condition if provided
+        if (fullName) {
+            queryConditions.push({ fullName: fullName });
+        }
+        
+        // Create query with $or to match any condition, or use single condition if only one
+        const userQuery = queryConditions.length > 1 ? { $or: queryConditions } : (queryConditions.length === 1 ? queryConditions[0] : {});
         
         const database = client.db("MyProductsDb");
         
@@ -746,12 +770,44 @@ app.get('/api/orders/stats/:userId', async (req, res) => {
         const pendingCount = await database.collection("PendingOrders").countDocuments(userQuery);
         const acceptedCount = await database.collection("AcceptedOrders").countDocuments(userQuery);
         const deliveredCount = await database.collection("DeliveredOrders").countDocuments(userQuery);
+        const walkInCount = await database.collection("WalkInOrders").countDocuments(userQuery);
+        
+        const cancellationQueryConditions = [];
+        if (userId !== 'by-email') {
+            if (userIdAsNumber !== null) {
+                cancellationQueryConditions.push(
+                    { userId: userIdAsNumber },
+                    { userIdString: userIdAsString },
+                    { userIdNumber: userIdAsNumber }
+                );
+            } else {
+                cancellationQueryConditions.push(
+                    { userId: userIdAsString },
+                    { userIdString: userIdAsString }
+                );
+            }
+        }
+
+        if (email) {
+            cancellationQueryConditions.push({ customerEmail: email });
+        }
+
+        if (fullName) {
+            cancellationQueryConditions.push({ customerName: fullName });
+        }
+
+        const cancellationQuery = cancellationQueryConditions.length > 1
+            ? { $or: cancellationQueryConditions }
+            : (cancellationQueryConditions.length === 1 ? cancellationQueryConditions[0] : {});
+
+        const cancellationCount = await database.collection("CancellationRequests").countDocuments(cancellationQuery);
         
         // Calculate total spent across all collections
         const collections = [
             { name: "PendingOrders", collection: database.collection("PendingOrders") },
             { name: "AcceptedOrders", collection: database.collection("AcceptedOrders") },
-            { name: "DeliveredOrders", collection: database.collection("DeliveredOrders") }
+            { name: "DeliveredOrders", collection: database.collection("DeliveredOrders") },
+            { name: "WalkInOrders", collection: database.collection("WalkInOrders") }
         ];
         
         let totalSpent = 0;
@@ -763,10 +819,12 @@ app.get('/api/orders/stats/:userId', async (req, res) => {
         }
         
         res.json({
-            totalOrders: pendingCount + acceptedCount + deliveredCount,
+            totalOrders: pendingCount + acceptedCount + deliveredCount + walkInCount + cancellationCount,
             pendingOrders: pendingCount,
             approvedOrders: acceptedCount,
             deliveredOrders: deliveredCount,
+            walkInOrders: walkInCount,
+            cancellationRequests: cancellationCount,
             totalSpent: totalSpent
         });
     } catch (error) {
@@ -784,15 +842,13 @@ app.get('/api/orders/all-staff', async (req, res) => {
         const pendingCollection = database.collection("PendingOrders");
         const acceptedCollection = database.collection("AcceptedOrders");
         const deliveredCollection = database.collection("DeliveredOrders");
-        const returnedCollection = database.collection("ReturnedOrders");
         const walkInCollection = database.collection("WalkInOrders");
         
-        // Fetch orders from all five collections
-        const [pendingOrders, acceptedOrders, deliveredOrders, returnedOrders, walkInOrders] = await Promise.all([
+        // Fetch orders from collections (excluding returned orders)
+        const [pendingOrders, acceptedOrders, deliveredOrders, walkInOrders] = await Promise.all([
             pendingCollection.find({}).sort({ createdAt: -1 }).toArray(),
             acceptedCollection.find({}).sort({ createdAt: -1 }).toArray(),
             deliveredCollection.find({}).sort({ createdAt: -1 }).toArray(),
-            returnedCollection.find({}).sort({ returnedAt: -1 }).toArray(),
             walkInCollection.find({}).sort({ createdAt: -1 }).toArray()
         ]);
         
@@ -802,7 +858,6 @@ app.get('/api/orders/all-staff', async (req, res) => {
             ...pendingOrders.map(order => ({ ...order, collection: 'pending', displayStatus: order.status === 'active' ? 'pending' : order.status })),
             ...acceptedOrders.map(order => ({ ...order, collection: 'accepted', displayStatus: 'approved' })),
             ...deliveredOrders.map(order => ({ ...order, collection: 'delivered', displayStatus: 'delivered' })),
-            ...returnedOrders.map(order => ({ ...order, collection: 'returned', displayStatus: 'returned' })),
             ...walkInOrders.map(order => ({ ...order, collection: 'walkin', displayStatus: 'completed' }))
         ];
         
@@ -844,7 +899,7 @@ app.get('/api/orders/return-requests', async (req, res) => {
     }
 });
 
-// API endpoint to get all user orders from all three collections
+// API endpoint to get all user orders from all collections (by userId, email, or fullName)
 app.get('/api/orders/:userId', async (req, res) => {
     try {
         const userId = req.params.userId;
@@ -857,24 +912,45 @@ app.get('/api/orders/:userId', async (req, res) => {
             });
         }
         
+        // Get email and fullName from query parameters if provided
+        const { email, fullName } = req.query;
         
         // Handle both string and number userIds
         const userIdAsString = String(userId);
         const userIdAsNumber = isNaN(userId) ? null : Number(userId);
         
-        
         const database = client.db("MyProductsDb");
         
-        // Fetch from all three collections
+        // Fetch from all order collections
         const pendingCollection = database.collection("PendingOrders");
         const acceptedCollection = database.collection("AcceptedOrders");
         const deliveredCollection = database.collection("DeliveredOrders");
+        const walkInCollection = database.collection("WalkInOrders");
         
-        // Create query that searches for both string and number versions
-        const userQuery = userIdAsNumber !== null ? 
-            { $or: [{ userId: userIdAsString }, { userId: userIdAsNumber }] } :
-            { userId: userIdAsString };
+        // Build query that matches by userId, email, or fullName
+        const queryConditions = [];
         
+        // Add userId conditions only if userId is not 'by-email' and is a valid identifier
+        if (userId !== 'by-email') {
+            if (userIdAsNumber !== null) {
+                queryConditions.push({ userId: userIdAsString }, { userId: userIdAsNumber });
+            } else {
+                queryConditions.push({ userId: userIdAsString });
+            }
+        }
+        
+        // Add email condition if provided
+        if (email) {
+            queryConditions.push({ email: email });
+        }
+        
+        // Add fullName condition if provided
+        if (fullName) {
+            queryConditions.push({ fullName: fullName });
+        }
+        
+        // Create query with $or to match any condition, or use single condition if only one
+        const userQuery = queryConditions.length > 1 ? { $or: queryConditions } : (queryConditions.length === 1 ? queryConditions[0] : {});
         
         // Get orders from each collection
         const pendingOrders = await pendingCollection.find(userQuery)
@@ -889,6 +965,10 @@ app.get('/api/orders/:userId', async (req, res) => {
             .sort({ createdAt: -1 })
             .toArray();
         
+        const walkInOrders = await walkInCollection.find(userQuery)
+            .sort({ createdAt: -1 })
+            .toArray();
+        
         
         // Debug: Show what userIds exist in the pending collection
         const allPendingOrders = await pendingCollection.find({}).toArray();
@@ -900,56 +980,176 @@ app.get('/api/orders/:userId', async (req, res) => {
             status: order.status || 'pending',
             collection: 'pending'
         }));
-        
+
         const acceptedWithStatus = acceptedOrders.map(order => ({
             ...order,
             status: order.status || 'approved',
             collection: 'accepted'
         }));
-        
+
         const deliveredWithStatus = deliveredOrders.map(order => ({
             ...order,
             status: order.status || 'delivered',
             collection: 'delivered'
         }));
-        
+
+        const walkInWithStatus = walkInOrders.map(order => ({
+            ...order,
+            status: order.status || 'completed',
+            collection: 'walkin'
+        }));
+
+        const normalizeCancellationStatus = (status) => {
+            const statusLower = (status || '').toLowerCase();
+            switch (statusLower) {
+                case 'pending_review':
+                case 'pending':
+                    return 'cancel_requested';
+                case 'approved':
+                    return 'cancel_approved';
+                case 'rejected':
+                    return 'cancel_rejected';
+                case 'processed':
+                    return 'cancel_processed';
+                default:
+                    return statusLower || 'cancel_requested';
+            }
+        };
+
+        // Ensure cancellationRequests exists by querying the collection
+        let cancellationRequests = [];
+        try {
+            const cancellationQueryConditions = [];
+            if (userId !== 'by-email') {
+                if (userIdAsNumber !== null) {
+                    cancellationQueryConditions.push(
+                        { userId: userIdAsNumber },
+                        { userIdString: userIdAsString },
+                        { userIdNumber: userIdAsNumber }
+                    );
+                } else {
+                    cancellationQueryConditions.push(
+                        { userId: userIdAsString },
+                        { userIdString: userIdAsString }
+                    );
+                }
+            }
+            if (email) {
+                cancellationQueryConditions.push({ customerEmail: email });
+            }
+            if (fullName) {
+                cancellationQueryConditions.push({ customerName: fullName });
+            }
+            const cancellationQuery = cancellationQueryConditions.length > 1
+                ? { $or: cancellationQueryConditions }
+                : (cancellationQueryConditions.length === 1 ? cancellationQueryConditions[0] : {});
+            cancellationRequests = await database
+                .collection("CancellationRequests")
+                .find(cancellationQuery)
+                .sort({ submittedAt: -1 })
+                .toArray();
+        } catch (e) {
+            console.error('❌ Error fetching CancellationRequests:', e);
+            cancellationRequests = [];
+        }
+
+        const cancellationWithStatus = cancellationRequests.map(request => {
+            const normalizedStatus = normalizeCancellationStatus(request.status);
+            const payment = request.payment || {};
+            return {
+                ...request,
+                status: normalizedStatus,
+                displayStatus: normalizedStatus,
+                collection: 'cancellation',
+                fullName: request.customerName || request.fullName,
+                email: request.customerEmail || request.email,
+                itemsordered: Array.isArray(request.itemsordered) ? request.itemsordered : [],
+                payment,
+                paymentMethod: request.paymentMethod || payment.method || null,
+                paymentType: request.paymentType || payment.type || null,
+                paymentSplitPercent: request.paymentSplitPercent || payment.splitPercent || null,
+                paymentReference: request.paymentReference || payment.reference || null,
+                paymentAmount: request.paymentAmount || payment.amount || null,
+                changeUponDelivery: request.changeUponDelivery || payment.changeUponDelivery || null,
+                proofOfPayment: request.proofOfPayment || payment.proof || null,
+                address: request.address || (request.shipping && request.shipping.address) || null,
+                phoneNumber: request.phoneNumber || (request.shipping && request.shipping.phoneNumber) || null,
+                total: request.originalOrderTotal ?? request.total ?? 0,
+                orderDate: request.submittedAt || request.originalOrderDate,
+                createdAt: request.submittedAt || request.originalOrderDate,
+                originalOrderDate: request.originalOrderDate || null,
+                hasPendingCancellation: normalizedStatus === 'cancel_requested'
+            };
+        });
+
         // Combine all orders
-        const allOrders = [...pendingWithStatus, ...acceptedWithStatus, ...deliveredWithStatus];
+        const allOrders = [...pendingWithStatus, ...acceptedWithStatus, ...deliveredWithStatus, ...walkInWithStatus, ...cancellationWithStatus];
+        
+        // Debug logging to help trace 500s
+        try {
+            console.log('[User Orders] totals => pending:', pendingOrders.length, 'accepted:', acceptedOrders.length, 'delivered:', deliveredOrders.length, 'walkin:', walkInOrders.length, 'cancellations:', cancellationRequests.length);
+        } catch (e) {}
         
         // Convert to the format expected by the frontend
-        const formattedOrders = allOrders.map(order => ({
-            items: order.itemsordered.map(item => ({
-                name: item.item_name,
-                quantity: item.amount_per_item,
-                price: item.price_per_item
-            })),
-            date: order.orderDate || order.createdAt,
-            status: order.status,
-            payment: order.payment,
-            // Add individual payment fields
-            paymentMethod: order.paymentMethod,
-            paymentType: order.paymentType,
-            paymentSplitPercent: order.paymentSplitPercent,
-            paymentReference: order.paymentReference,
-            paymentAmount: order.paymentAmount,
-            changeUponDelivery: order.changeUponDelivery,
-            proofOfPayment: order.proofOfPayment,
-            shipping: { 
-                address: order.address,
-                phoneNumber: order.phoneNumber || (order.shipping && order.shipping.phoneNumber) || ''
-            },
-            notes: order.notes,
-            _id: order._id,
-            collection: order.collection,
-            orderNumber: order.orderNumber,
-            fullName: order.fullName,
-            email: order.email,
-            total: order.total
-        }));
-        
+        let formattedOrders = [];
+        try {
+            formattedOrders = allOrders.map((order, idx) => {
+                const itemsArray = Array.isArray(order.itemsordered) ? order.itemsordered : [];
+                const safePayment = order.payment || null;
+                const safeDate = order.orderDate || order.createdAt || order.submittedAt || order.originalOrderDate || null;
+                const safeShippingPhone = (order && order.phoneNumber) || (order && order.shipping && order.shipping.phoneNumber) || '';
+                const safeAddress = (order && order.address) || (order && order.shipping && order.shipping.address) || null;
+                return {
+                    items: itemsArray.map(item => ({
+                        name: item && item.item_name,
+                        quantity: item && item.amount_per_item,
+                        price: item && item.price_per_item,
+                        image: (item && item.item_image) || null
+                    })),
+                    date: safeDate,
+                    status: order && order.status,
+                    payment: safePayment,
+                    paymentMethod: order && order.paymentMethod,
+                    paymentType: order && order.paymentType,
+                    paymentSplitPercent: order && order.paymentSplitPercent,
+                    paymentReference: order && order.paymentReference,
+                    paymentAmount: order && order.paymentAmount,
+                    changeUponDelivery: order && order.changeUponDelivery,
+                    proofOfPayment: order && order.proofOfPayment,
+                    shipping: { 
+                        address: safeAddress,
+                        phoneNumber: safeShippingPhone
+                    },
+                    notes: order && order.notes,
+                    _id: order && order._id,
+                    collection: order && order.collection,
+                    orderNumber: order && order.orderNumber,
+                    fullName: (order && (order.fullName || order.customerName)) || null,
+                    email: (order && (order.email || order.customerEmail)) || null,
+                    total: (order && (order.total ?? order.originalOrderTotal)) ?? 0,
+                    reason: order && order.reason,
+                    additionalComments: order && order.additionalComments,
+                    submittedAt: order && order.submittedAt,
+                    originalOrderDate: order && order.originalOrderDate,
+                    displayStatus: (order && (order.displayStatus || order.status)) || null,
+                    hasPendingCancellation: !!(order && order.hasPendingCancellation)
+                };
+            });
+        } catch (mapErr) {
+            console.error('❌ Error mapping formatted orders:', mapErr);
+            // Fallback to empty array on mapping error to avoid 500
+            formattedOrders = [];
+        }
+         
         // Sort by date (newest first)
-        formattedOrders.sort((a, b) => new Date(b.date) - new Date(a.date));
-        
+        try {
+            formattedOrders.sort((a, b) => {
+                const da = a && a.date ? new Date(a.date) : new Date(0);
+                const db = b && b.date ? new Date(b.date) : new Date(0);
+                return db - da;
+            });
+        } catch (e) {}
+         
         res.json(formattedOrders);
     } catch (error) {
         console.error("Error fetching user orders:", error);
@@ -1153,6 +1353,7 @@ app.post('/api/orders/migrate', async (req, res) => {
                         userId: userId,
                         itemsordered: (order.items || []).map(item => ({
                             item_name: item.name || item.item_name || 'Unknown Item',
+                            item_image: item.image || item.item_image || null, // Include item image
                             amount_per_item: item.quantity || item.amount_per_item || 1,
                             price_per_item: item.price || item.price_per_item || 0,
                             total_item_price: (item.price || 0) * (item.quantity || 1)
@@ -1286,13 +1487,6 @@ app.post('/api/staff/login', async (req, res) => {
 app.post('/api/user-addresses', async (req, res) => {
     try {
         const { userId, email, addressData } = req.body;
-<<<<<<< HEAD
-        if (!addressData) {
-            return res.status(400).json({ error: 'Missing addressData' });
-        }
-        if (!userId && !email) {
-            return res.status(400).json({ error: 'Missing userId or email' });
-=======
         
         // Support both userId and email for address association
         if (!addressData) {
@@ -1301,13 +1495,14 @@ app.post('/api/user-addresses', async (req, res) => {
         
         if (!userId && !email) {
             return res.status(400).json({ success: false, error: 'Missing userId or email' });
->>>>>>> restore_from_6h
         }
         
         const database = client.db('MyProductsDb');
         const collection = database.collection('UserAddresses');
 
-<<<<<<< HEAD
+        console.log('📮 Saving address to database: MyProductsDb, collection: UserAddresses');
+        console.log('📮 User identifier:', { userId, email });
+
         // Build query for finding existing addresses to unset default
         const userQuery = {};
         if (userId) {
@@ -1322,14 +1517,6 @@ app.post('/api/user-addresses', async (req, res) => {
             userQuery.email = email;
         }
 
-=======
-        console.log('📮 Saving address to database: MyProductsDb, collection: UserAddresses');
-        console.log('📮 User identifier:', { userId, email });
-
-        // Build query to find user's addresses (support both userId and email)
-        const userQuery = userId ? { userId } : { email };
-        
->>>>>>> restore_from_6h
         // If this address is set as default, unset all others for this user
         if (addressData.isDefault) {
             console.log('📮 Unsetting other default addresses for user');
@@ -1339,18 +1526,14 @@ app.post('/api/user-addresses', async (req, res) => {
             );
         }
 
-<<<<<<< HEAD
-        // Build document - include userId if provided, email if provided
-=======
         // Build document to save - include both userId and email if available
->>>>>>> restore_from_6h
         const doc = {
             ...addressData,
             createdAt: new Date(),
             updatedAt: new Date()
         };
         
-<<<<<<< HEAD
+        // Add userId and/or email to the document
         if (userId) {
             // Convert userId to number if possible
             if (!isNaN(userId)) {
@@ -1362,13 +1545,8 @@ app.post('/api/user-addresses', async (req, res) => {
         if (email) {
             doc.email = email;
         }
-=======
-        // Add userId and/or email to the document
-        if (userId) doc.userId = userId;
-        if (email) doc.email = email;
         
         console.log('📮 Document to save:', JSON.stringify(doc, null, 2));
->>>>>>> restore_from_6h
         
         const result = await collection.insertOne(doc);
         console.log('✅ Address saved successfully! Inserted ID:', result.insertedId);
@@ -1384,15 +1562,9 @@ app.post('/api/user-addresses', async (req, res) => {
 // API endpoint to get user addresses by userId or email
 app.get('/api/user-addresses', async (req, res) => {
     try {
-<<<<<<< HEAD
-        let { userId, email } = req.query;
-        
-        // Support both userId and email lookup
-=======
         const { userId, email } = req.query;
         
         // Support both userId and email for address lookup
->>>>>>> restore_from_6h
         if (!userId && !email) {
             return res.status(400).json({ error: 'Missing userId or email' });
         }
@@ -1401,7 +1573,6 @@ app.get('/api/user-addresses', async (req, res) => {
         const collection = database.collection('UserAddresses');
         
         // Build query - support both userId and email
-<<<<<<< HEAD
         const query = {};
         if (userId) {
             // Convert userId to number if possible
@@ -1412,13 +1583,6 @@ app.get('/api/user-addresses', async (req, res) => {
             }
         }
         if (email) {
-=======
-        let query = {};
-        if (userId) {
-            // Convert userId to number if possible
-            query.userId = !isNaN(userId) ? Number(userId) : userId;
-        } else if (email) {
->>>>>>> restore_from_6h
             query.email = email;
         }
         
@@ -1798,11 +1962,7 @@ app.get('/api/orders/walkin/stats', async (req, res) => {
     }
 });
 
-<<<<<<< HEAD
-// NOTE: Duplicate endpoint removed - using the one at line 1318 that supports both userId and email
-=======
 // Duplicate endpoint removed - using the one above that supports both userId and email
->>>>>>> restore_from_6h
 
 // API endpoint for comprehensive staff dashboard statistics
 app.get('/api/orders/stats/comprehensive', async (req, res) => {
@@ -2448,10 +2608,22 @@ app.post('/api/orders/cancel-request', async (req, res) => {
         // Create cancellation request record
         const cancellationRequest = {
             originalOrderId: orderId,
+            userId: originalOrder.userId || null,
+            userIdString: originalOrder.userId !== undefined && originalOrder.userId !== null ? String(originalOrder.userId) : null,
+            userIdNumber: originalOrder.userId !== undefined && originalOrder.userId !== null && !isNaN(Number(originalOrder.userId)) ? Number(originalOrder.userId) : null,
             orderNumber: originalOrder.orderNumber || `ORD-${orderId.slice(-6)}`,
             customerName: originalOrder.fullName || originalOrder.buyerinfo || 'N/A',
             customerEmail: originalOrder.email || 'N/A',
             customerPhone: originalOrder.phoneNumber || 'N/A',
+            itemsordered: originalOrder.itemsordered || [],
+            payment: originalOrder.payment || null,
+            paymentMethod: originalOrder.paymentMethod || (originalOrder.payment && originalOrder.payment.method) || null,
+            paymentType: originalOrder.paymentType || (originalOrder.payment && originalOrder.payment.type) || null,
+            paymentSplitPercent: originalOrder.paymentSplitPercent || (originalOrder.payment && originalOrder.payment.splitPercent) || null,
+            paymentReference: originalOrder.paymentReference || (originalOrder.payment && originalOrder.payment.reference) || null,
+            paymentAmount: originalOrder.paymentAmount || (originalOrder.payment && originalOrder.payment.amount) || null,
+            changeUponDelivery: originalOrder.changeUponDelivery || (originalOrder.payment && originalOrder.payment.changeUponDelivery) || null,
+            proofOfPayment: originalOrder.proofOfPayment || (originalOrder.payment && originalOrder.payment.proof) || null,
             reason: reason,
             additionalComments: additionalComments || '',
             originalOrderTotal: originalOrder.total || 0,
@@ -2460,12 +2632,27 @@ app.post('/api/orders/cancel-request', async (req, res) => {
             status: 'pending_review', // pending_review, approved, rejected, processed
             submittedAt: new Date(),
             submittedBy: 'customer',
-            sourceCollection: sourceCollection.name
+            sourceCollection: sourceCollection.name,
+            notes: originalOrder.notes || '',
+            address: originalOrder.address || null,
+            shipping: originalOrder.shipping || null,
+            phoneNumber: originalOrder.phoneNumber || (originalOrder.shipping && originalOrder.shipping.phoneNumber) || null
         };
 
         // Save cancellation request to CancellationRequests collection
         const cancellationRequestsCollection = database.collection("CancellationRequests");
         const result = await cancellationRequestsCollection.insertOne(cancellationRequest);
+
+        // Remove the original order from its source collection now that the cancellation request is stored
+        const deleteResult = await sourceCollection.collection.deleteOne({ _id: new ObjectId(orderId) });
+        if (deleteResult.deletedCount === 0) {
+            console.error(`❌ Failed to remove original order ${orderId} from ${sourceCollection.name} after creating cancellation request. Rolling back cancellation request.`);
+            await cancellationRequestsCollection.deleteOne({ _id: result.insertedId });
+            return res.status(500).json({
+                success: false,
+                message: "Failed to remove the original order after creating the cancellation request. Please try again."
+            });
+        }
 
 
         // Create staff notification for new cancellation request
@@ -2506,6 +2693,57 @@ app.post('/api/orders/cancel-request', async (req, res) => {
     }
 });
 
+
+// API endpoint to check if orders have pending cancellation requests
+app.post('/api/orders/check-cancellation-requests', async (req, res) => {
+    try {
+        const { orderIds } = req.body;
+        
+        if (!orderIds || !Array.isArray(orderIds)) {
+            return res.status(400).json({
+                success: false,
+                message: "orderIds array is required"
+            });
+        }
+
+        const database = client.db("MyProductsDb");
+        const cancellationRequestsCollection = database.collection("CancellationRequests");
+        const { ObjectId } = require('mongodb');
+
+        // Convert orderIds to ObjectIds
+        const objectIds = orderIds.map(id => {
+            try {
+                return new ObjectId(id);
+            } catch (e) {
+                return null;
+            }
+        }).filter(id => id !== null);
+
+        // Find pending cancellation requests for these orders
+        const pendingCancellations = await cancellationRequestsCollection.find({
+            originalOrderId: { $in: objectIds },
+            status: { $in: ['pending_review', 'pending'] }
+        }).toArray();
+
+        // Create a map of orderId -> hasPendingCancellation
+        const cancellationMap = {};
+        pendingCancellations.forEach(cancellation => {
+            cancellationMap[cancellation.originalOrderId.toString()] = true;
+        });
+
+        res.json({
+            success: true,
+            cancellationMap: cancellationMap
+        });
+
+    } catch (error) {
+        console.error("❌ Error checking cancellation requests:", error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+});
 
 // API endpoint to get cancellation requests for staff review
 app.get('/api/orders/cancellation-requests', async (req, res) => {

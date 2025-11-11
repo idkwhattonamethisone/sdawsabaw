@@ -764,19 +764,6 @@
             }
         }
 
-<<<<<<< HEAD
-        // Load user addresses from database/storage using email
-        async function loadUserAddresses() {
-            try {
-                // Fetch from backend API using email instead of userId
-                const email = currentUser.email;
-                if (!email) {
-                    throw new Error('User email not found');
-                }
-                
-                const response = await fetch('http://localhost:3000/api/user-addresses?email=' + encodeURIComponent(email));
-                if (!response.ok) throw new Error('Failed to fetch addresses from server');
-=======
         // Page loader helpers for addresses grid
         function showLoadingAddresses() {
             const grid = document.getElementById('addressesGrid');
@@ -812,7 +799,6 @@
                     throw new Error('Failed to fetch addresses from server');
                 }
                 
->>>>>>> restore_from_6h
                 const addresses = await response.json();
                 console.log('📮 Loaded', addresses.length, 'addresses from MongoDB');
                 
@@ -938,13 +924,8 @@
                 return;
             }
             try {
-<<<<<<< HEAD
-                // Show loading spinner
                 showLoadingAddresses();
                 
-=======
-                showLoadingAddresses();
->>>>>>> restore_from_6h
                 const response = await fetch('http://localhost:3000/api/user-addresses/' + encodeURIComponent(addressId), {
                     method: 'DELETE'
                 });
@@ -961,13 +942,8 @@
         // Toggle default address via API
         async function toggleDefault(addressId) {
             try {
-<<<<<<< HEAD
-                // Show loading spinner
                 showLoadingAddresses();
                 
-=======
-                showLoadingAddresses();
->>>>>>> restore_from_6h
                 const response = await fetch('http://localhost:3000/api/user-addresses/' + encodeURIComponent(addressId) + '/default', {
                     method: 'PUT'
                 });

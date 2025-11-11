@@ -193,10 +193,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 topLoginBtn.textContent = currentUser.fullName;
                 if (userDropdown) userDropdown.style.display = 'none';
             } else if (currentUser && currentUser.email) {
-<<<<<<< HEAD
                 // For any email, use the email username part
-=======
->>>>>>> restore_from_6h
                 const username = currentUser.email.split('@')[0];
                 topLoginBtn.textContent = username;
                 if (userDropdown) userDropdown.style.display = 'none';
@@ -209,15 +206,9 @@ document.addEventListener('DOMContentLoaded', () => {
             if (userDropdown) userDropdown.style.display = 'none';
         }
     }
-<<<<<<< HEAD
     
     // Make updateTopLoginBtn globally accessible
     window.updateTopLoginBtn = updateTopLoginBtn;
-    
-=======
-    // expose globally for reuse
-    window.updateTopLoginBtn = updateTopLoginBtn;
->>>>>>> restore_from_6h
     updateTopLoginBtn();
 
     // Set up cart button click handler

@@ -23,13 +23,10 @@ class LoginButton {
         newBtn.id = 'topLoginBtn';
         newBtn.className = 'account-btn';
         newBtn.href = '#';
-<<<<<<< HEAD
-=======
         
         // Create text span (no icon)
         const textSpan = document.createElement('span');
         textSpan.className = 'login-text';
->>>>>>> restore_from_6h
 
         // Check login state
         const currentUser = Auth.getCurrentUser();
@@ -52,12 +49,9 @@ class LoginButton {
             };
         }
 
-<<<<<<< HEAD
-=======
         // Assemble button (text only)
         newBtn.appendChild(textSpan);
 
->>>>>>> restore_from_6h
         // Replace old button
         this.button.parentNode.replaceChild(newBtn, this.button);
         this.button = newBtn;

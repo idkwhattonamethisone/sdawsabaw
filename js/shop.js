@@ -18,6 +18,18 @@ function formatPHPPrice(price) {
         currency: 'PHP'
     }).format(price);
 }
+
+// Truncate product names to first 3 words and append a small ellipsis if longer
+function truncateProductName(name) {
+    if (!name || typeof name !== 'string') return '';
+    const words = name.trim().split(/\s+/);
+    if (words.length <= 3) return name.trim();
+    // If the first word is long (>4 chars), only keep first 2 words
+    const keepCount = (words[0].length > 4) ? 2 : 3;
+    const kept = words.slice(0, keepCount).join(' ');
+    // Replace remaining words with a single ellipsis (not additional)
+    return `${kept} <span class="ellipsis-small">…</span>`;
+}
 // Multi-mode removed - drag and drop only
 // Pagination window state (5 pages at a time)
 let paginationStart = 1; // first page number currently shown in the window
@@ -398,7 +410,7 @@ function displayProducts(productsToDisplay = filteredProducts) {
                     </div>
                 </div>
                 <div class="product-content">
-                    <h3 class="product-title">${product.name}</h3>
+                    <h3 class="product-title">${truncateProductName(product.name)}</h3>
                 </div>
             </a>
             

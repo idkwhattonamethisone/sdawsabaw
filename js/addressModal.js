@@ -346,8 +346,6 @@ class AddressModalManager {
         
         if (isPostLogin) {
             title.textContent = 'Add Your First Address';
-<<<<<<< HEAD
-=======
             // Safety: ensure logged-in user exists
             const currentUser = Auth.getCurrentUser();
             if (!currentUser || (!currentUser.email && !currentUser.id)) {
@@ -364,7 +362,6 @@ class AddressModalManager {
             } catch (err) {
                 console.warn('userHasAddressesAsync failed, proceeding to show modal');
             }
->>>>>>> restore_from_6h
         } else {
             title.textContent = 'Add Address';
         }
@@ -439,8 +436,6 @@ class AddressModalManager {
         console.log('Button state updated - disabled:', submitBtn.disabled, 'HTML:', submitBtn.innerHTML);
         
         try {
-<<<<<<< HEAD
-=======
             // Show loading state
             submitBtn.disabled = true;
             btnText.innerHTML = '<span class="loading-spinner"></span>Saving...';
@@ -449,7 +444,6 @@ class AddressModalManager {
                 requestAnimationFrame(() => requestAnimationFrame(resolve));
             });
             
->>>>>>> restore_from_6h
             const currentUser = Auth.getCurrentUser();
             if (!currentUser) {
                 throw new Error('You must be logged in to save an address');
@@ -470,18 +464,13 @@ class AddressModalManager {
             };
             console.log('DEBUG: addressData to save:', addressData);
 
-<<<<<<< HEAD
-            // Validate required fields
-=======
             // Validate required fields (basic inline validation)
->>>>>>> restore_from_6h
             const requiredFields = ['label', 'streetAddress', 'barangay', 'city', 'postalCode', 'province'];
             for (const field of requiredFields) {
                 if (!addressData[field]) {
                     throw new Error(`${field.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())} is required`);
                 }
             }
-<<<<<<< HEAD
 
             // Enhanced validation using basic validation rules
             // Validate label (should not be empty and reasonable length)
@@ -510,24 +499,6 @@ class AddressModalManager {
             }
 
             // Validate postal code (4 digits)
-=======
-            // Enhanced validation rules
-            if (addressData.label.length < 2 || addressData.label.length > 50) {
-                throw new Error('Address label must be between 2 and 50 characters');
-            }
-            if (addressData.streetAddress.length < 5 || addressData.streetAddress.length > 200) {
-                throw new Error('Street address must be between 5 and 200 characters');
-            }
-            if (addressData.barangay.length < 2 || addressData.barangay.length > 100) {
-                throw new Error('Barangay must be between 2 and 100 characters');
-            }
-            if (addressData.city.length < 2 || addressData.city.length > 100) {
-                throw new Error('City must be between 2 and 100 characters');
-            }
-            if (addressData.province.length < 2 || addressData.province.length > 100) {
-                throw new Error('Province must be between 2 and 100 characters');
-            }
->>>>>>> restore_from_6h
             if (!/^\d{4}$/.test(addressData.postalCode)) {
                 throw new Error('Postal code must be exactly 4 digits');
             }
@@ -535,7 +506,6 @@ class AddressModalManager {
             // Save address
             await this.saveAddress(addressData);
             
-<<<<<<< HEAD
             // Refresh the addresses cache after saving
             // This ensures hasAddresses() will work correctly
             if (currentUser && currentUser.email) {
@@ -572,11 +542,6 @@ class AddressModalManager {
                 }
             }
             
-=======
-            // Delay slightly so spinner is perceived
-            await new Promise(resolve => setTimeout(resolve, 300));
-            showToast('Address added successfully!', 'success');
->>>>>>> restore_from_6h
             this.close();
 
             // Refresh cached addresses by email for subsequent checks
@@ -597,7 +562,6 @@ class AddressModalManager {
             
         } catch (error) {
             console.error('Error saving address:', error);
-<<<<<<< HEAD
             console.log('showToast available:', typeof showToast);
             
             // Keep spinner visible briefly so user can see something happened
@@ -645,16 +609,6 @@ class AddressModalManager {
                     submitBtn.textContent = originalText;
                     submitBtn.innerHTML = originalText;
                 }
-=======
-            // Keep spinner visible briefly before showing error
-            await new Promise(resolve => setTimeout(resolve, 300));
-            showToast(error.message || 'Failed to save address. Please check your input and try again.', 'error');
-        } finally {
-            // Reset button state after brief delay
-            setTimeout(() => {
-                submitBtn.disabled = false;
-                btnText.textContent = originalText;
->>>>>>> restore_from_6h
             }, 500);
         }
     }
@@ -671,33 +625,22 @@ class AddressModalManager {
             // Use the backend server URL for API requests
             const apiBaseUrl = 'http://localhost:3000'; // Change this if your backend runs elsewhere
             console.log('DEBUG: Sending fetch to ' + apiBaseUrl + '/api/user-addresses');
-<<<<<<< HEAD
+            console.log('DEBUG: Current user:', { email: currentUser.email, id: currentUser.id });
             
-            // Build request body - prefer email, fallback to userId
+            // Build request body - send both email and userId if available, server will handle it
             const requestBody = {
-                addressData
+                addressData: addressData
             };
+            // Include both email and userId - server will use whichever is available
             if (currentUser.email) {
                 requestBody.email = currentUser.email;
             }
             if (currentUser.id) {
                 requestBody.userId = currentUser.id;
             }
-            
-=======
-            console.log('DEBUG: Current user:', { email: currentUser.email, id: currentUser.id });
-            
-            // Build request body - send both email and userId if available, server will handle it
-            const requestBody = { 
-                addressData: addressData
-            };
-            // Include both email and userId - server will use whichever is available
-            if (currentUser.email) requestBody.email = currentUser.email;
-            if (currentUser.id) requestBody.userId = currentUser.id;
 
             console.log('DEBUG: Request body:', JSON.stringify(requestBody, null, 2));
 
->>>>>>> restore_from_6h
             const response = await fetch(apiBaseUrl + '/api/user-addresses', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -737,49 +680,19 @@ class AddressModalManager {
         }
     }
 
-<<<<<<< HEAD
-    // Check if user has addresses (async version that fetches from API using email)
-    async userHasAddressesAsync() {
-        try {
-            const currentUser = Auth.getCurrentUser();
-            if (!currentUser || !currentUser.email) return false;
-            
-            const apiBaseUrl = 'http://localhost:3000';
-            const response = await fetch(`${apiBaseUrl}/api/user-addresses?email=${encodeURIComponent(currentUser.email)}`);
-            if (!response.ok) return false;
-            
-            const addresses = await response.json();
-            return Array.isArray(addresses) && addresses.length > 0;
-        } catch (error) {
-            console.error('Error checking addresses:', error);
-            return false;
-        }
-    }
-
-    // Check if user has addresses (sync version - checks cache, but async check is preferred)
-    userHasAddresses() {
-        try {
-            const currentUser = Auth.getCurrentUser();
-            if (!currentUser || !currentUser.id) return false;
-            
-            // Try to use cached result from addressesPromise if available
-            // Note: This returns a promise, but the function should be used with async/await
-            // For backward compatibility, we check if the promise resolves synchronously
-            // which it won't, so this is mainly for checking the cache
-            return false; // Always return false for sync check, use userHasAddressesAsync() instead
-=======
-    // Async check if user has addresses via API using email
+    // Check if user has addresses (async version that fetches from API using email or userId)
     async userHasAddressesAsync() {
         try {
             const currentUser = Auth.getCurrentUser();
             if (!currentUser || (!currentUser.email && !currentUser.id)) return false;
+            
             const apiBaseUrl = 'http://localhost:3000';
             const param = currentUser.email ? `email=${encodeURIComponent(currentUser.email)}` : `userId=${encodeURIComponent(currentUser.id)}`;
             const response = await fetch(`${apiBaseUrl}/api/user-addresses?${param}`);
             if (!response.ok) return false;
+            
             const addresses = await response.json();
             return Array.isArray(addresses) && addresses.length > 0;
->>>>>>> restore_from_6h
         } catch (error) {
             console.error('Error checking addresses:', error);
             return false;

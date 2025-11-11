@@ -159,11 +159,7 @@
         window.addEventListener('load', function(){ setTimeout(runBrandAnimation, 50); }, { once: true });
       })();
     </script>
-<<<<<<< HEAD
     
-=======
-     
->>>>>>> restore_from_6h
     <script src="js/shop.js"></script>
     <script src="js/stockDisplay.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/2.0.2/anime.min.js"></script>
@@ -713,6 +709,8 @@
             border-color: #e63946;
             box-shadow: 0 0 0 2px rgba(230, 57, 70, 0.2);
         }
+        /* Small ellipsis for truncated titles */
+        .ellipsis-small { font-size: 0.85em; opacity: 0.7; }
         /* Quick glow for CTA text and subtle button halo */
         .carousel-cta .cta-text.glow { animation: ctaQuickGlow 0.6s ease-out 1; }
         .carousel-cta.glow-btn { animation: ctaBtnHalo 0.6s ease-out 1; }
@@ -1330,6 +1328,14 @@
                     .filter(key => productsByCategory[key] && productsByCategory[key].length)
                     .map(key => [key, productsByCategory[key]]);
 
+                function truncateName(name){
+                    if (!name || typeof name !== 'string') return '';
+                    const words = name.trim().split(/\s+/);
+                    if (words.length <= 3) return name.trim();
+                    const keepCount = (words[0].length > 4) ? 2 : 3;
+                    return words.slice(0, keepCount).join(' ') + ' <span class="ellipsis-small">…</span>';
+                }
+
                 categoryCarousel.innerHTML = orderedEntries.map(([category, categoryProducts], index) => `
                     <div class="carousel-products ${index === 0 ? 'active' : ''}" data-category="${category}">
                         <div class="carousel-products-inner">
@@ -1345,7 +1351,7 @@
                                             </div>
                                         </div>
                                         <div class="category-content">
-                                            <h3 class="category-title">${product.name}</h3>
+                                            <h3 class="category-title">${truncateName(product.name)}</h3>
                                         </div>
                                     </a>
                                     
@@ -1415,7 +1421,7 @@
                                     </div>
                                 </div>
                                 <div class="category-content">
-                                    <h3 class="category-title">${product.name}</h3>
+                                    <h3 class="category-title">${truncateName(product.name)}</h3>
                                 </div>
                             </a>
 

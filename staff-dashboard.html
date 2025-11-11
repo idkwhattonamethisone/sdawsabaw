@@ -1393,8 +1393,6 @@
                                 <option value="pending">Pending</option>
                                 <option value="approved">Approved</option>
                                 <option value="delivered">Delivered</option>
-                                <option value="returned">Returned</option>
-                                <option value="cancelled">Cancelled</option>
                                 <option value="completed">Walk-in/Completed</option>
                             </select>
                             <select id="paymentMethodFilter" class="form-control payment-filter-select">
@@ -1687,6 +1685,77 @@
                 <button class="action-btn primary" id="changeToApproved" data-status="approved">Change to Approved</button>
                 <button class="action-btn primary" id="changeToDelivered" data-status="delivered">Change to Delivered</button>
                 <button class="action-btn secondary" id="changeToReturned" data-status="returned">Change to Returned</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Return Request Details Modal -->
+    <div class="modal" id="returnModal">
+        <div class="modal-content order-modal-content">
+            <button class="modal-close" id="returnModalClose">×</button>
+            
+            <!-- Header -->
+            <div class="modal-header">
+                <h2 class="modal-title">Return Request Details</h2>
+            </div>
+            
+            <div class="order-details-form">
+                <!-- Return Info Card -->
+                <div class="order-card-section">
+                    <div class="order-header-card">
+                        <div class="order-id-section">
+                            <h3 id="returnModalOrderId">ORD-12345</h3>
+                            <button class="copy-btn" onclick="copyReturnOrderId()">Copy</button>
+                        </div>
+                        <div class="order-date-section">
+                            <span id="returnModalRequestDate">Jun 25, 2025 5:53 PM</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Customer Information Card -->
+                <div class="order-card-section">
+                    <h3 class="section-title">Customer Information</h3>
+                    <div class="info-grid" id="returnCustomerInfo">
+                        <!-- Customer info will be populated here -->
+                    </div>
+                </div>
+                
+                <!-- Return Details Card -->
+                <div class="order-card-section">
+                    <h3 class="section-title">Return Details</h3>
+                    <div class="info-grid" id="returnDetailsInfo">
+                        <!-- Return details will be populated here -->
+                    </div>
+                </div>
+
+                <!-- Return Items Card -->
+                <div class="order-card-section">
+                    <h3 class="section-title">Items to Return</h3>
+                    <div class="items-list-modern" id="returnModalItems">
+                        <!-- Items will be populated here -->
+                    </div>
+                </div>
+
+                <!-- Return Image Card -->
+                <div class="order-card-section" id="returnImageSection" style="display: none;">
+                    <h3 class="section-title">Return Documentation</h3>
+                    <div class="return-image-container" id="returnImageContainer">
+                        <!-- Return image will be displayed here -->
+                    </div>
+                </div>
+                
+                <!-- Staff Information Card -->
+                <div class="order-card-section">
+                    <h3 class="section-title">Request Information</h3>
+                    <div class="info-grid" id="returnRequestInfo">
+                        <!-- Request info will be populated here -->
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal-actions">
+                <button class="action-btn cancel" id="closeReturnModal">Close</button>
             </div>
         </div>
     </div>
@@ -2724,14 +2793,9 @@
 
                     // Update tab badge with total orders count
                     const ordersTabBadge = document.getElementById('ordersTabBadge');
-<<<<<<< HEAD
-                    if (ordersTabBadge && this.orders) {
-                        ordersTabBadge.textContent = this.orders.length;
-=======
                     if (ordersTabBadge) {
                         const totalOrders = Array.isArray(this.orders) ? this.orders.length : 0;
                         ordersTabBadge.textContent = totalOrders;
->>>>>>> restore_from_6h
                     }
 
                     this.checkForNewOrders();
@@ -2762,6 +2826,7 @@
                     // Handle both array response and object with returnRequests property
                     this.returns = Array.isArray(data) ? data : (data.returnRequests || []);
                     console.log('📦 Returns loaded from API:', this.returns.length);
+                    console.log('📦 Sample return request:', this.returns[0] || 'No returns found');
                     
                     // Cache the returns
                     this._cache.returns = this.returns;
@@ -2777,15 +2842,9 @@
                     // Update tab badges
                     const ordersTabBadge = document.getElementById('ordersTabBadge');
                     const returnsTabBadge = document.getElementById('returnsTabBadge');
-<<<<<<< HEAD
-                    if (ordersTabBadge && this.orders) {
-                        // Show total orders count in the badge
-                        ordersTabBadge.textContent = this.orders.length;
-=======
                     if (ordersTabBadge) {
                         const totalOrders = Array.isArray(this.orders) ? this.orders.length : 0;
                         ordersTabBadge.textContent = totalOrders;
->>>>>>> restore_from_6h
                     }
                     if (returnsTabBadge) {
                         const totalReturns = Array.isArray(this.returns) ? this.returns.length : 0;
@@ -3467,6 +3526,15 @@
                 document.getElementById('closeOrderModal').addEventListener('click', () => {
                     document.getElementById('orderModal').classList.remove('show');
                 });
+                
+                // Return modal event listeners
+                document.getElementById('returnModalClose').addEventListener('click', () => {
+                    document.getElementById('returnModal').classList.remove('show');
+                });
+                
+                document.getElementById('closeReturnModal').addEventListener('click', () => {
+                    document.getElementById('returnModal').classList.remove('show');
+                });
 
                 // Status change buttons event listeners
                 document.getElementById('changeToPending').addEventListener('click', () => {
@@ -3560,43 +3628,25 @@
                 }
             }
 
-<<<<<<< HEAD
-            updateFiltersForTab(tab) {
-                const orderStatusFilter = document.getElementById('orderStatusFilter');
-                const paymentMethodFilter = document.getElementById('paymentMethodFilter');
-                
-                if (!orderStatusFilter) return;
-
-                if (tab === 'orders') {
-                    // Show orders filter options
-=======
             // Dynamically update status/payment filters per active tab
             updateFiltersForTab(tab) {
                 const orderStatusFilter = document.getElementById('orderStatusFilter');
                 const paymentMethodFilter = document.getElementById('paymentMethodFilter');
                 if (!orderStatusFilter) return;
                 if (tab === 'orders') {
->>>>>>> restore_from_6h
                     orderStatusFilter.innerHTML = `
                         <option value="all">All Orders</option>
                         <option value="pending">Pending</option>
                         <option value="approved">Approved</option>
                         <option value="delivered">Delivered</option>
-                        <option value="returned">Returned</option>
-                        <option value="cancelled">Cancelled</option>
                         <option value="completed">Walk-in/Completed</option>
                     `;
-<<<<<<< HEAD
                     // Show payment method filter
                     if (paymentMethodFilter) {
                         paymentMethodFilter.style.display = '';
                     }
                 } else if (tab === 'returns') {
                     // Show returns filter options
-=======
-                    if (paymentMethodFilter) paymentMethodFilter.style.display = '';
-                } else if (tab === 'returns') {
->>>>>>> restore_from_6h
                     orderStatusFilter.innerHTML = `
                         <option value="all">All Returns</option>
                         <option value="pending_review">Pending Review</option>
@@ -3604,7 +3654,6 @@
                         <option value="rejected">Rejected</option>
                         <option value="completed">Completed</option>
                     `;
-<<<<<<< HEAD
                     // Hide payment method filter for returns
                     if (paymentMethodFilter) {
                         paymentMethodFilter.style.display = 'none';
@@ -3612,10 +3661,6 @@
                 }
                 
                 // Reset to 'all' when switching tabs
-=======
-                    if (paymentMethodFilter) paymentMethodFilter.style.display = 'none';
-                }
->>>>>>> restore_from_6h
                 orderStatusFilter.value = 'all';
             }
 
@@ -4064,7 +4109,11 @@
                 }
 
                 // Sort by request date (newest first)
-                filteredReturns.sort((a, b) => new Date(b.requestDate || b.createdAt || b.original_date) - new Date(a.requestDate || a.createdAt || a.original_date));
+                filteredReturns.sort((a, b) => {
+                    const dateA = a.submittedAt || a.requestDate || a.createdAt || a.original_date;
+                    const dateB = b.submittedAt || b.requestDate || b.createdAt || b.original_date;
+                    return new Date(dateB || 0) - new Date(dateA || 0);
+                });
 
                 const start = (this.currentPage - 1) * this.itemsPerPage;
                 const end = start + this.itemsPerPage;
@@ -4085,13 +4134,17 @@
                 }
 
                 tbody.innerHTML = displayed.map(returnRequest => {
-                    const orderNumber = returnRequest.orderNumber || this.generateOrderNumber(returnRequest);
-                    const customerName = returnRequest.fullName || returnRequest.buyerinfo || 'N/A';
-                    const requestDate = new Date(returnRequest.requestDate || returnRequest.createdAt || returnRequest.original_date).toLocaleString();
-                    const status = returnRequest.status || 'pending';
+                    const orderNumber = returnRequest.orderNumber || returnRequest.originalOrderId || 'N/A';
+                    const customerName = returnRequest.customerName || returnRequest.fullName || returnRequest.buyerinfo || 'N/A';
+                    const requestDate = returnRequest.submittedAt 
+                        ? new Date(returnRequest.submittedAt).toLocaleString() 
+                        : (returnRequest.requestDate || returnRequest.createdAt || returnRequest.original_date 
+                            ? new Date(returnRequest.requestDate || returnRequest.createdAt || returnRequest.original_date).toLocaleString() 
+                            : 'Invalid Date');
+                    const status = returnRequest.status || 'pending_review';
                     const returnType = returnRequest.returnType || 'Return';
-                    const reason = returnRequest.returnReason || 'No reason provided';
-                    const itemsCount = (returnRequest.itemsordered || []).length;
+                    const reason = returnRequest.reason || returnRequest.returnReason || 'No reason provided';
+                    const itemsCount = (returnRequest.selectedItems || returnRequest.itemsordered || []).length;
 
                     return `
                         <tr>
@@ -4108,13 +4161,13 @@
                             <td>${itemsCount} item${itemsCount !== 1 ? 's' : ''}</td>
                             <td>${requestDate}</td>
                             <td>
-                                <span class="status-badge ${status.toLowerCase()}">
-                                    ${status.charAt(0).toUpperCase() + status.slice(1)}
+                                <span class="status-badge ${status.toLowerCase().replace('_', '-')}">
+                                    ${status.replace('_', ' ').split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
                                 </span>
                             </td>
                             <td>
                                 <button class="action-btn small" onclick="staffDashboard.viewReturn('${returnRequest._id}')">View</button>
-                                ${status === 'pending' ? `
+                                ${status === 'pending_review' || status === 'pending' ? `
                                     <button class="action-btn small primary" onclick="staffDashboard.processReturn('${returnRequest._id}')">Process</button>
                                 ` : ''}
                             </td>
@@ -6089,9 +6142,140 @@
                     return;
                 }
 
-                // Use the existing order modal to display return details
-                this.currentEditingOrder = returnRequest;
-                this.viewOrder(returnId);
+                this.currentEditingReturn = returnRequest;
+                
+                // Populate return order ID and date
+                const orderNumber = returnRequest.orderNumber || returnRequest.originalOrderId || 'N/A';
+                document.getElementById('returnModalOrderId').textContent = orderNumber;
+                
+                const requestDate = returnRequest.submittedAt 
+                    ? new Date(returnRequest.submittedAt) 
+                    : (returnRequest.requestDate || returnRequest.createdAt || returnRequest.original_date 
+                        ? new Date(returnRequest.requestDate || returnRequest.createdAt || returnRequest.original_date) 
+                        : new Date());
+                
+                document.getElementById('returnModalRequestDate').textContent = requestDate.toLocaleDateString('en-US', {
+                    year: 'numeric',
+                    month: 'short',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+                
+                // Populate customer information
+                const customerInfo = document.getElementById('returnCustomerInfo');
+                customerInfo.innerHTML = `
+                    <div class="info-row">
+                        <span class="info-label">Customer Name</span>
+                        <span class="info-value">${returnRequest.customerName || returnRequest.fullName || returnRequest.buyerinfo || 'N/A'}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Email</span>
+                        <span class="info-value">${returnRequest.customerEmail || returnRequest.email || 'N/A'}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Phone</span>
+                        <span class="info-value">${returnRequest.customerPhone || returnRequest.phoneNumber || 'N/A'}</span>
+                    </div>
+                `;
+                
+                // Populate return details
+                const returnDetails = document.getElementById('returnDetailsInfo');
+                returnDetails.innerHTML = `
+                    <div class="info-row">
+                        <span class="info-label">Return Type</span>
+                        <span class="info-value">
+                            <span class="return-type-badge">${returnRequest.returnType || 'Return'}</span>
+                        </span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Reason</span>
+                        <span class="info-value">${returnRequest.reason || returnRequest.returnReason || 'No reason provided'}</span>
+                    </div>
+                    ${returnRequest.additionalComments ? `
+                        <div class="info-row">
+                            <span class="info-label">Additional Comments</span>
+                            <span class="info-value">${returnRequest.additionalComments}</span>
+                        </div>
+                    ` : ''}
+                    <div class="info-row">
+                        <span class="info-label">Status</span>
+                        <span class="info-value">
+                            <span class="status-badge ${(returnRequest.status || 'pending_review').toLowerCase().replace('_', '-')}">
+                                ${(returnRequest.status || 'pending_review').replace('_', ' ').split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
+                            </span>
+                        </span>
+                    </div>
+                `;
+                
+                // Populate return items
+                const itemsList = document.getElementById('returnModalItems');
+                const selectedItems = returnRequest.selectedItems || returnRequest.itemsordered || [];
+                
+                if (selectedItems.length > 0) {
+                    itemsList.innerHTML = selectedItems.map(item => `
+                        <div class="order-item-modern">
+                            <div class="item-image">
+                                ${item.image ? `<img src="${item.image}" alt="${item.name || 'Item'}" onerror="this.style.display='none'">` : '<div class="no-image">No Image</div>'}
+                            </div>
+                            <div class="item-details">
+                                <h4 class="item-name">${item.name || item.productName || 'Unknown Item'}</h4>
+                                <p class="item-sku">SKU: ${item.sku || item.id || 'N/A'}</p>
+                                <div class="item-meta">
+                                    <span class="item-quantity">Quantity: ${item.quantity || 1}</span>
+                                    <span class="item-price">₱${(item.price || 0).toFixed(2)}</span>
+                                </div>
+                            </div>
+                        </div>
+                    `).join('');
+                } else {
+                    itemsList.innerHTML = '<p class="no-items">No items specified for return</p>';
+                }
+                
+                // Display return image if available
+                const returnImageSection = document.getElementById('returnImageSection');
+                const returnImageContainer = document.getElementById('returnImageContainer');
+                if (returnRequest.returnImage) {
+                    returnImageSection.style.display = 'block';
+                    returnImageContainer.innerHTML = `
+                        <img src="${returnRequest.returnImage}" alt="Return documentation" class="return-doc-image" onerror="this.style.display='none'">
+                    `;
+                } else {
+                    returnImageSection.style.display = 'none';
+                }
+                
+                // Populate request information
+                const requestInfo = document.getElementById('returnRequestInfo');
+                requestInfo.innerHTML = `
+                    <div class="info-row">
+                        <span class="info-label">Request ID</span>
+                        <span class="info-value technical-value">${returnRequest._id || 'N/A'}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Original Order ID</span>
+                        <span class="info-value technical-value">${returnRequest.originalOrderId || 'N/A'}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Submitted At</span>
+                        <span class="info-value">${requestDate.toLocaleString()}</span>
+                    </div>
+                    ${returnRequest.processedAt ? `
+                        <div class="info-row">
+                            <span class="info-label">Processed At</span>
+                            <span class="info-value">${new Date(returnRequest.processedAt).toLocaleString()}</span>
+                        </div>
+                    ` : ''}
+                    ${returnRequest.staffNotes ? `
+                        <div class="info-row">
+                            <span class="info-label">Staff Notes</span>
+                            <span class="info-value">${returnRequest.staffNotes}</span>
+                        </div>
+                    ` : ''}
+                `;
+                
+                // Show modal
+                const modal = document.getElementById('returnModal');
+                modal.classList.add('show');
             }
 
             // Process return request
@@ -6157,6 +6341,23 @@
             }
             
             document.body.removeChild(textArea);
+        }
+        
+        // Copy return order ID
+        function copyReturnOrderId() {
+            const orderIdElement = document.getElementById('returnModalOrderId');
+            const orderText = orderIdElement.textContent;
+            
+            // Use the Clipboard API if available
+            if (navigator.clipboard && window.isSecureContext) {
+                navigator.clipboard.writeText(orderText).then(() => {
+                    showToast('Return Order ID copied to clipboard!', 'success');
+                }).catch(() => {
+                    fallbackCopyTextToClipboard(orderText);
+                });
+            } else {
+                fallbackCopyTextToClipboard(orderText);
+            }
         }
 
         // Initialize Enhanced Staff Dashboard after DOM is fully loaded

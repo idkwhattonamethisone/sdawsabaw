@@ -1189,23 +1189,14 @@ select.form-control:focus {
 .walkin-orders-table-container {
   background: var(--card-bg);
   border-radius: 0 0 var(--border-radius) var(--border-radius);
-<<<<<<< HEAD
   padding: 0 1.5rem 1.5rem 1.5rem;
   padding-top: 0 !important;
   box-shadow: 0 4px 12px var(--shadow);
   border: 1px solid var(--input-border);
   border-top: none;
-=======
-  padding: 1.5rem;
-  box-shadow: 0 4px 12px var(--shadow);
-  border: 1px solid var(--input-border);
-  border-top: none;
   margin-top: 0 !important;
-  padding-top: 0 !important;
->>>>>>> restore_from_6h
   overflow-x: auto;
   margin-bottom: 2rem;
-  margin-top: 0 !important;
 }
 
 /* Ensure tab content is visible when displayed */
@@ -3144,6 +3135,57 @@ select.form-control:focus {
     justify-content: flex-end;
     flex-shrink: 0;
     align-items: center;
+}
+
+/* Mark as container styling */
+.mark-as-container {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-left: auto;
+}
+
+.mark-as-label {
+    font-weight: 500;
+    color: var(--text);
+    white-space: nowrap;
+}
+
+.mark-as-select {
+    padding: 0.5rem 1rem;
+    border: 1px solid var(--input-border);
+    border-radius: var(--border-radius);
+    background: var(--card-bg);
+    color: var(--text);
+    font-size: 0.95rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    min-width: 150px;
+}
+
+.mark-as-select:hover {
+    border-color: var(--primary);
+}
+
+.mark-as-select:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(230, 57, 70, 0.1);
+}
+
+/* Return image container */
+.return-image-container {
+    width: 100%;
+    max-width: 500px;
+    margin: 1rem 0;
+}
+
+.return-doc-image {
+    width: 100%;
+    height: auto;
+    border-radius: var(--border-radius);
+    border: 1px solid var(--input-border);
+    box-shadow: 0 2px 8px var(--shadow);
 }
 
 /* Payment section modern styling */
