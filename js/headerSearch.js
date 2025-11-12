@@ -7,27 +7,32 @@ function formatPHPPrice(price) {
 
 // CRITICAL: Start API call IMMEDIATELY when script loads, before DOMContentLoaded
 // Share the products promise with other scripts to avoid duplicate fetches
+// OPTIMIZED: Use limit and skipSort for much faster loading
 (function startProductsFetch() {
     // Only create promise if it doesn't already exist (to avoid duplicate fetches)
     if (!window.productsPromise) {
-        window.productsPromise = fetch('http://localhost:3000/api/products').then(response => {
+        // Fetch limited products for search (500 is enough for search functionality)
+        // Use skipSort=true to skip expensive server-side sorting
+        // Use minimal=true to only fetch essential fields (dramatically reduces data size)
+        const SEARCH_PRODUCTS_LIMIT = 500;
+        window.productsPromise = fetch(`http://localhost:3000/api/products?limit=${SEARCH_PRODUCTS_LIMIT}&skipSort=true&minimal=true`).then(response => {
             if (!response.ok) throw new Error('Failed to fetch products');
             return response.json();
         }).then(products => {
-            // Convert price to number - prefer SellingPrice, but fall back gracefully
+            // Optimized price conversion - single pass, check most common fields first
             const toNumber = (val) => {
                 if (val === null || val === undefined) return NaN;
                 if (typeof val === 'object' && val.$numberDecimal !== undefined) return parseFloat(val.$numberDecimal);
                 return parseFloat(val);
             };
             return products.map(product => {
-                const candidates = [product.SellingPrice, product.sellingPrice, product.Price, product.price];
-                let finalPrice = NaN;
-                for (const c of candidates) {
-                    const n = toNumber(c);
-                    if (!isNaN(n)) { finalPrice = n; break; }
-                }
-                return { ...product, price: finalPrice };
+                // Fast price extraction - check most common fields first
+                const price = toNumber(product.SellingPrice) || 
+                             toNumber(product.sellingPrice) || 
+                             toNumber(product.Price) || 
+                             toNumber(product.price) || 
+                             NaN;
+                return { ...product, price };
             });
         }).catch(error => {
             console.error('Error fetching products:', error);
@@ -46,29 +51,30 @@ document.addEventListener('DOMContentLoaded', () => {
     // Load products from API (use shared promise if available)
     async function loadProducts() {
         try {
-            // Use shared promise if available, otherwise fetch separately
+            // Use shared promise if available, otherwise fetch separately with optimizations
             if (window.productsPromise) {
                 products = await window.productsPromise;
             } else {
-                const response = await fetch('http://localhost:3000/api/products');
+                // Fallback: fetch with limit and skipSort for performance
+                const SEARCH_PRODUCTS_LIMIT = 500;
+                const response = await fetch(`http://localhost:3000/api/products?limit=${SEARCH_PRODUCTS_LIMIT}&skipSort=true&minimal=true`);
                 if (!response.ok) {
                     throw new Error('Failed to fetch products');
                 }
                 products = await response.json();
-                // Convert price to number - prefer SellingPrice, but fall back gracefully
+                // Optimized price conversion
                 const toNumber = (val) => {
                     if (val === null || val === undefined) return NaN;
                     if (typeof val === 'object' && val.$numberDecimal !== undefined) return parseFloat(val.$numberDecimal);
                     return parseFloat(val);
                 };
                 products = products.map(product => {
-                    const candidates = [product.SellingPrice, product.sellingPrice, product.Price, product.price];
-                    let finalPrice = NaN;
-                    for (const c of candidates) {
-                        const n = toNumber(c);
-                        if (!isNaN(n)) { finalPrice = n; break; }
-                }
-                    return { ...product, price: finalPrice };
+                    const price = toNumber(product.SellingPrice) || 
+                                 toNumber(product.sellingPrice) || 
+                                 toNumber(product.Price) || 
+                                 toNumber(product.price) || 
+                                 NaN;
+                    return { ...product, price };
                 });
             }
         } catch (error) {

@@ -2056,6 +2056,13 @@ select.form-control:focus {
   margin-bottom: 1.5rem;
 }
 
+/* Override modal-title color for order and return modals */
+.order-modal-content .modal-title,
+#orderModal .modal-title,
+#returnModal .modal-title {
+  color: #ffffff !important;
+}
+
 .form-group {
   margin-bottom: 1.5rem;
 }
@@ -2946,11 +2953,22 @@ select.form-control:focus {
     flex-shrink: 0;
 }
 
-.modal-header h2 {
-    margin: 0;
-    font-size: 1.3rem;
-    font-weight: 600;
-    color: white;
+.order-modal-content .modal-header h2,
+.order-modal-content .modal-header .modal-title,
+.order-modal-content .modal-header h2.modal-title,
+.modal-header h2.modal-title,
+.modal-header .modal-title,
+#orderModal .modal-header h2,
+#orderModal .modal-header .modal-title,
+#orderModal .modal-header h2.modal-title,
+#returnModal .modal-header h2,
+#returnModal .modal-header .modal-title,
+#returnModal .modal-header h2.modal-title {
+    margin: 0 !important;
+    font-size: 1.3rem !important;
+    font-weight: 600 !important;
+    color: #ffffff !important;
+    text-shadow: none !important;
 }
 
 .order-modal-content .modal-close {

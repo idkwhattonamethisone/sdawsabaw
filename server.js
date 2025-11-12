@@ -82,7 +82,7 @@ app.get('/api/products', async (req, res) => {
         // Build query filter
         let queryFilter = { isActive: true };
         
-        // Category filter support
+        // Category filter support - optimized to avoid regex when possible
         if (req.query.category && req.query.category !== 'all') {
             // Support normalized category buckets
             const categoryMap = {
@@ -103,60 +103,173 @@ app.get('/api/products', async (req, res) => {
             }
         }
         
-        // Price range filter - will be handled after fetching since price might be in different fields
-        // We'll handle this in the application layer for now
+        // Parse pagination parameters with defaults
+        const limit = req.query.limit ? parseInt(req.query.limit) : 12; // Default to 12 if not specified
+        const skip = req.query.skip ? parseInt(req.query.skip) : 0;
         
-        // Build query
-        let query = collection.find(queryFilter);
+        // Check if sorting should be skipped (for performance on index page)
+        const skipSort = req.query.skipSort === 'true' || req.query.noSort === 'true';
         
-        // Sorting - we need to handle price sorting differently since it can be in different fields
-        // For now, fetch all and sort client-side, or use aggregation pipeline
-        // Let's use a simpler approach: sort by name first, price will be handled client-side if needed
-        if (req.query.sortBy) {
-            switch(req.query.sortBy) {
-                case 'price-low':
-                    // Try to sort by common price fields - MongoDB will use first available
-                    query = query.sort({ 'SellingPrice': 1 });
-                    // If that doesn't exist, we'll handle in aggregation or client-side
-                    break;
-                case 'price-high':
-                    query = query.sort({ 'SellingPrice': -1 });
-                    break;
-                case 'name':
-                    query = query.sort({ name: 1 });
-                    break;
+        // Check if minimal fields should be returned (for list views - much faster)
+        const minimalFields = req.query.minimal === 'true' || req.query.fields === 'minimal' || skipSort;
+        
+        // Define projection for minimal fields (only what's needed for list views)
+        const minimalProjection = {
+            _id: 1,
+            name: 1,
+            image: 1,
+            SellingPrice: 1,
+            sellingPrice: 1,
+            Price: 1,
+            price: 1,
+            stockQuantity: 1,
+            category: 1,
+            isActive: 1
+        };
+        
+        // Determine sort field and direction
+        let sortField = 'name';
+        let sortDirection = 1;
+        if (!skipSort) {
+            if (req.query.sortBy) {
+                switch(req.query.sortBy) {
+                    case 'price-low':
+                        sortField = 'SellingPrice';
+                        sortDirection = 1;
+                        break;
+                    case 'price-high':
+                        sortField = 'SellingPrice';
+                        sortDirection = -1;
+                        break;
+                    case 'name':
+                        sortField = 'name';
+                        sortDirection = 1;
+                        break;
+                }
             }
-        } else {
-            // Default: sort by name for consistent ordering
-            query = query.sort({ name: 1 });
         }
         
-        // Get total count before pagination (for pagination info)
-        const totalCount = await collection.countDocuments(queryFilter);
+        // Generate ETag for caching (based on query params only - check BEFORE database query)
+        // This allows server to return 304 immediately without processing
+        const crypto = require('crypto');
+        const cacheKey = `${limit}-${skip}-${req.query.category || 'all'}-${req.query.sortBy || 'default'}-${skipSort}-${minimalFields}`;
+        const etag = crypto.createHash('md5').update(cacheKey).digest('hex');
         
-        // Pagination support
-        if (req.query.skip) {
-            const skip = parseInt(req.query.skip);
-            if (skip > 0) {
-                query = query.skip(skip);
+        // Set caching headers
+        res.setHeader('Cache-Control', 'public, max-age=60'); // Cache for 60 seconds
+        res.setHeader('ETag', `"${etag}"`);
+        
+        // Check If-None-Match header BEFORE database query - return 304 immediately if cached
+        const ifNoneMatch = req.headers['if-none-match'];
+        if (ifNoneMatch === `"${etag}"` || ifNoneMatch === etag) {
+            return res.status(304).end();
+        }
+        
+        // Use find() with sort for better performance when possible
+        // Only use aggregation if we need complex operations
+        let products;
+        let totalCount;
+        
+        // Run count in parallel with the query for better performance
+        const countPromise = req.query.includeMeta === 'true' 
+            ? collection.countDocuments(queryFilter)
+            : Promise.resolve(0);
+        
+        try {
+            // Try using find() first - it's faster than aggregate for simple queries
+            let query = collection.find(queryFilter);
+            
+            // Add projection for minimal fields if requested (dramatically reduces data transfer)
+            if (minimalFields) {
+                query = query.project(minimalProjection);
+            }
+            
+            // Only add sort if not skipped (for performance)
+            if (!skipSort) {
+                query = query.sort({ [sortField]: sortDirection });
+            }
+            
+            query = query.skip(skip).limit(limit);
+            
+            products = await query.toArray();
+            totalCount = await countPromise;
+            
+        } catch (error) {
+            // If find() fails (e.g., memory limit), fall back to aggregation with allowDiskUse
+            if (error.code === 292 || error.codeName === 'QueryExceededMemoryLimitNoDiskUseAllowed') {
+                console.warn('⚠️ Using aggregation fallback for products query');
+                
+                const pipeline = [
+                    { $match: queryFilter }
+                ];
+                
+                // Add projection for minimal fields if requested
+                if (minimalFields) {
+                    pipeline.push({ $project: minimalProjection });
+                }
+                
+                // Only add sort if not skipped
+                if (!skipSort) {
+                    pipeline.push({ $sort: { [sortField]: sortDirection } });
+                }
+                
+                pipeline.push({ $skip: skip });
+                pipeline.push({ $limit: limit });
+                
+                try {
+                    products = await collection.aggregate(pipeline, { allowDiskUse: true }).toArray();
+                    totalCount = await countPromise;
+                } catch (aggError) {
+                    // Last resort: fetch limited batch and sort in memory
+                    if (aggError.code === 292 || aggError.codeName === 'QueryExceededMemoryLimitNoDiskUseAllowed') {
+                        console.warn('⚠️ allowDiskUse not supported, using in-memory sort fallback');
+                        
+                        // Fetch only what we need + a small buffer for pagination
+                        const fetchLimit = Math.min(skip + limit + 100, 1000); // Max 1000 for performance
+                        const noSortPipeline = [
+                            { $match: queryFilter }
+                        ];
+                        
+                        // Add projection for minimal fields if requested
+                        if (minimalFields) {
+                            noSortPipeline.push({ $project: minimalProjection });
+                        }
+                        
+                        noSortPipeline.push({ $limit: fetchLimit });
+                        
+                        let fetchedProducts = await collection.aggregate(noSortPipeline).toArray();
+                        
+                        // Sort in memory
+                        fetchedProducts.sort((a, b) => {
+                            const aVal = a[sortField];
+                            const bVal = b[sortField];
+                            if (sortField === 'SellingPrice') {
+                                const diff = (parseFloat(aVal) || 0) - (parseFloat(bVal) || 0);
+                                return diff * sortDirection;
+                            }
+                            const diff = (aVal || '').localeCompare(bVal || '');
+                            return diff * sortDirection;
+                        });
+                        
+                        // Apply pagination
+                        products = fetchedProducts.slice(skip, skip + limit);
+                        totalCount = await countPromise;
+                    } else {
+                        throw aggError;
+                    }
+                }
+            } else {
+                throw error;
             }
         }
-        
-        // Limit support
-        const limit = req.query.limit ? parseInt(req.query.limit) : null;
-        if (limit && limit > 0) {
-            query = query.limit(limit);
-        }
-        
-        const products = await query.toArray();
         
         // Return products with pagination metadata
         if (req.query.includeMeta === 'true') {
             res.json({
                 products: products,
                 totalCount: totalCount,
-                currentPage: req.query.skip ? Math.floor(parseInt(req.query.skip) / (limit || totalCount)) + 1 : 1,
-                totalPages: limit ? Math.ceil(totalCount / limit) : 1
+                currentPage: Math.floor(skip / limit) + 1,
+                totalPages: Math.ceil(totalCount / limit)
             });
         } else {
             res.json(products);
@@ -656,15 +769,18 @@ app.get('/api/orders/pending', async (req, res) => {
         
         
         // Return orders with status "Pending" or "active" - include new active orders
-        const pendingOrders = await collection.find({ 
-            $or: [
-                { status: "Pending" },
-                { status: "pending" },
-                { status: "active" }
-            ]
-        })
-            .sort({ createdAt: -1 })
-            .toArray();
+        const pendingOrders = await collection.aggregate([
+            { 
+                $match: { 
+                    $or: [
+                        { status: "Pending" },
+                        { status: "pending" },
+                        { status: "active" }
+                    ]
+                }
+            },
+            { $sort: { createdAt: -1 } }
+        ], { allowDiskUse: true }).toArray();
         
         // Map the orders to the required format
         const formattedOrders = pendingOrders.map(order => ({
@@ -838,32 +954,154 @@ app.get('/api/orders/all-staff', async (req, res) => {
     try {
         console.log('🎯 HIT: /api/orders/all-staff endpoint - this is the correct route!');
         
+        const minimal = req.query.minimal === 'true';
+        const limit = req.query.limit ? parseInt(req.query.limit, 10) : null;
+        
         const database = client.db("MyProductsDb");
         const pendingCollection = database.collection("PendingOrders");
         const acceptedCollection = database.collection("AcceptedOrders");
         const deliveredCollection = database.collection("DeliveredOrders");
         const walkInCollection = database.collection("WalkInOrders");
+        const returnedCollection = database.collection("ReturnedOrders");
         
-        // Fetch orders from collections (excluding returned orders)
-        const [pendingOrders, acceptedOrders, deliveredOrders, walkInOrders] = await Promise.all([
-            pendingCollection.find({}).sort({ createdAt: -1 }).toArray(),
-            acceptedCollection.find({}).sort({ createdAt: -1 }).toArray(),
-            deliveredCollection.find({}).sort({ createdAt: -1 }).toArray(),
-            walkInCollection.find({}).sort({ createdAt: -1 }).toArray()
+        const minimalProjection = {
+            _id: 1,
+            orderNumber: 1,
+            buyerinfo: 1,
+            fullName: 1,
+            email: 1,
+            phoneNumber: 1,
+            total: 1,
+            status: 1,
+            paymentMethod: 1,
+            paymentType: 1,
+            paymentAmount: 1,
+            paymentSplitPercent: 1,
+            changeUponDelivery: 1,
+            paymentVerified: 1,
+            address: 1,
+            delivery_address: 1,
+            notes: 1,
+            createdAt: 1,
+            orderDate: 1,
+            original_date: 1,
+            deliveryFee: 1,
+            serviceFee: 1,
+            itemsordered: {
+                $map: {
+                    input: { $ifNull: ['$itemsordered', []] },
+                    as: 'item',
+                    in: {
+                        item_name: '$$item.item_name',
+                        amount_per_item: '$$item.amount_per_item',
+                        per_item_price: '$$item.per_item_price',
+                        total_item_price: '$$item.total_item_price',
+                        unit: '$$item.unit'
+                    }
+                }
+            },
+            hasProofOfPayment: {
+                $gt: [
+                    { $strLenCP: { $ifNull: ['$proofOfPayment', ''] } },
+                    0
+                ]
+            }
+        };
+        
+        const buildPipeline = () => {
+            const pipeline = [{ $match: {} }];
+            if (minimal) {
+                pipeline.push({ $project: minimalProjection });
+            }
+            pipeline.push({ $sort: { createdAt: -1 } });
+            if (limit && limit > 0) {
+                pipeline.push({ $limit: limit });
+            }
+            return pipeline;
+        };
+        
+        const pipeline = buildPipeline();
+        
+        // Fetch orders from collections (including returned orders)
+        const [pendingOrders, acceptedOrders, deliveredOrders, walkInOrders, returnedOrders] = await Promise.all([
+            pendingCollection.aggregate(pipeline, { allowDiskUse: true }).toArray(),
+            acceptedCollection.aggregate(pipeline, { allowDiskUse: true }).toArray(),
+            deliveredCollection.aggregate(pipeline, { allowDiskUse: true }).toArray(),
+            walkInCollection.aggregate(pipeline, { allowDiskUse: true }).toArray(),
+            returnedCollection.aggregate(pipeline, { allowDiskUse: true }).toArray()
         ]);
         
+        const enhanceOrder = (order, collection, displayStatus) => {
+            const base = {
+                ...order,
+                collection,
+                displayStatus
+            };
+            
+            if (minimal) {
+                return {
+                    ...base,
+                    hasProofOfPayment: order.hasProofOfPayment || false,
+                    proofOfPayment: undefined
+                };
+            }
+            
+            return base;
+        };
         
         // Add collection info to each order for identification
         const allOrders = [
-            ...pendingOrders.map(order => ({ ...order, collection: 'pending', displayStatus: order.status === 'active' ? 'pending' : order.status })),
-            ...acceptedOrders.map(order => ({ ...order, collection: 'accepted', displayStatus: 'approved' })),
-            ...deliveredOrders.map(order => ({ ...order, collection: 'delivered', displayStatus: 'delivered' })),
-            ...walkInOrders.map(order => ({ ...order, collection: 'walkin', displayStatus: 'completed' }))
+            ...pendingOrders.map(order => enhanceOrder(order, 'pending', order.status === 'active' ? 'pending' : order.status)),
+            ...acceptedOrders.map(order => enhanceOrder(order, 'accepted', 'approved')),
+            ...deliveredOrders.map(order => enhanceOrder(order, 'delivered', 'delivered')),
+            ...walkInOrders.map(order => enhanceOrder(order, 'walkin', 'completed')),
+            ...returnedOrders.map(order => {
+                const enhanced = enhanceOrder(order, 'returned', 'returned');
+                enhanced.isReturned = true; // Flag for view-only
+                // Map return-specific fields to standard order fields for display
+                enhanced.originalOrderId = order.originalOrderId;
+                enhanced.returnReason = order.customerReason || order.returnReason;
+                enhanced.returnType = order.returnType;
+                enhanced.returnedAt = order.processedAt || order.returnedAt;
+                enhanced.returnProcessedBy = order.processedBy || 'staff';
+                enhanced.staffNotes = order.staffNotes;
+                enhanced.staffDecisionImage = order.staffDecisionImage;
+                enhanced.customerImage = order.customerImage;
+                enhanced.staffDecision = order.staffDecision || order.status;
+                // If originalOrderSnapshot exists, merge its fields for display
+                if (order.originalOrderSnapshot) {
+                    const original = order.originalOrderSnapshot;
+                    // Merge order fields from original snapshot
+                    enhanced.itemsordered = original.itemsordered || enhanced.itemsordered;
+                    enhanced.fullName = original.fullName || enhanced.fullName || order.customerName;
+                    enhanced.buyerinfo = original.buyerinfo || enhanced.buyerinfo;
+                    enhanced.email = original.email || enhanced.email || order.customerEmail;
+                    enhanced.phoneNumber = original.phoneNumber || enhanced.phoneNumber || order.customerPhone;
+                    enhanced.address = original.address || enhanced.address;
+                    enhanced.delivery_address = original.delivery_address || enhanced.delivery_address;
+                    enhanced.total = original.total || enhanced.total;
+                    enhanced.subtotal = original.subtotal || enhanced.subtotal;
+                    enhanced.deliveryFee = original.deliveryFee || enhanced.deliveryFee;
+                    enhanced.serviceFee = original.serviceFee || enhanced.serviceFee;
+                    enhanced.paymentMethod = original.paymentMethod || enhanced.paymentMethod;
+                    enhanced.paymentType = original.paymentType || enhanced.paymentType;
+                    enhanced.paymentAmount = original.paymentAmount || enhanced.paymentAmount;
+                    enhanced.paymentSplitPercent = original.paymentSplitPercent || enhanced.paymentSplitPercent;
+                    enhanced.changeUponDelivery = original.changeUponDelivery !== undefined ? original.changeUponDelivery : enhanced.changeUponDelivery;
+                    enhanced.paymentVerified = original.paymentVerified !== undefined ? original.paymentVerified : enhanced.paymentVerified;
+                    enhanced.notes = original.notes || enhanced.notes;
+                    enhanced.createdAt = original.createdAt || enhanced.createdAt || order.submittedAt;
+                    enhanced.orderDate = original.orderDate || enhanced.orderDate;
+                    enhanced.original_date = original.original_date || enhanced.original_date;
+                    enhanced.proofOfPayment = original.proofOfPayment || enhanced.proofOfPayment;
+                    enhanced.userId = original.userId || enhanced.userId;
+                }
+                return enhanced;
+            })
         ];
         
         // Sort all orders by creation date (newest first)
         allOrders.sort((a, b) => new Date(b.createdAt || b.orderDate || b.returnedAt) - new Date(a.createdAt || a.orderDate || a.returnedAt));
-        
         
         res.json(allOrders);
         
@@ -873,15 +1111,61 @@ app.get('/api/orders/all-staff', async (req, res) => {
     }
 });
 
+// API endpoint to get detailed order information (search across collections)
+app.get('/api/orders/details/:orderId', async (req, res) => {
+    try {
+        const { orderId } = req.params;
+        const database = client.db("MyProductsDb");
+        
+        const collections = [
+            { name: 'pending', displayStatus: 'pending', collection: database.collection("PendingOrders") },
+            { name: 'accepted', displayStatus: 'approved', collection: database.collection("AcceptedOrders") },
+            { name: 'delivered', displayStatus: 'delivered', collection: database.collection("DeliveredOrders") },
+            { name: 'walkin', displayStatus: 'completed', collection: database.collection("WalkInOrders") },
+            { name: 'returned', displayStatus: 'returned', collection: database.collection("ReturnedOrders") }
+        ];
+        
+        let detailedOrder = null;
+        
+        for (const { name, displayStatus, collection } of collections) {
+            let found = null;
+            try {
+                found = await collection.findOne({ _id: new ObjectId(orderId) });
+            } catch (error) {
+                // Ignore ObjectId errors and try next collection
+            }
+            
+            if (found) {
+                detailedOrder = {
+                    ...found,
+                    collection: name,
+                    displayStatus: found.displayStatus || displayStatus
+                };
+                break;
+            }
+        }
+        
+        if (!detailedOrder) {
+            return res.status(404).json({ error: "Order not found" });
+        }
+        
+        res.json(detailedOrder);
+    } catch (error) {
+        console.error("❌ Error fetching order details:", error);
+        res.status(500).json({ error: "Failed to fetch order details" });
+    }
+});
+
 // API endpoint to get return requests for staff review
 app.get('/api/orders/return-requests', async (req, res) => {
     try {
         const database = client.db("MyProductsDb");
         const returnRequestsCollection = database.collection("ReturnRequests");
 
-        const returnRequests = await returnRequestsCollection.find({})
-            .sort({ submittedAt: -1 })
-            .toArray();
+        const returnRequests = await returnRequestsCollection.aggregate([
+            { $match: {} },
+            { $sort: { submittedAt: -1 } }
+        ], { allowDiskUse: true }).toArray();
 
         res.json({
             success: true,
@@ -953,21 +1237,25 @@ app.get('/api/orders/:userId', async (req, res) => {
         const userQuery = queryConditions.length > 1 ? { $or: queryConditions } : (queryConditions.length === 1 ? queryConditions[0] : {});
         
         // Get orders from each collection
-        const pendingOrders = await pendingCollection.find(userQuery)
-            .sort({ createdAt: -1 })
-            .toArray();
+        const pendingOrders = await pendingCollection.aggregate([
+            { $match: userQuery },
+            { $sort: { createdAt: -1 } }
+        ], { allowDiskUse: true }).toArray();
         
-        const acceptedOrders = await acceptedCollection.find(userQuery)
-            .sort({ createdAt: -1 })
-            .toArray();
+        const acceptedOrders = await acceptedCollection.aggregate([
+            { $match: userQuery },
+            { $sort: { createdAt: -1 } }
+        ], { allowDiskUse: true }).toArray();
             
-        const deliveredOrders = await deliveredCollection.find(userQuery)
-            .sort({ createdAt: -1 })
-            .toArray();
+        const deliveredOrders = await deliveredCollection.aggregate([
+            { $match: userQuery },
+            { $sort: { createdAt: -1 } }
+        ], { allowDiskUse: true }).toArray();
         
-        const walkInOrders = await walkInCollection.find(userQuery)
-            .sort({ createdAt: -1 })
-            .toArray();
+        const walkInOrders = await walkInCollection.aggregate([
+            { $match: userQuery },
+            { $sort: { createdAt: -1 } }
+        ], { allowDiskUse: true }).toArray();
         
         
         // Debug: Show what userIds exist in the pending collection
@@ -1045,9 +1333,10 @@ app.get('/api/orders/:userId', async (req, res) => {
                 : (cancellationQueryConditions.length === 1 ? cancellationQueryConditions[0] : {});
             cancellationRequests = await database
                 .collection("CancellationRequests")
-                .find(cancellationQuery)
-                .sort({ submittedAt: -1 })
-                .toArray();
+                .aggregate([
+                    { $match: cancellationQuery },
+                    { $sort: { submittedAt: -1 } }
+                ], { allowDiskUse: true }).toArray();
         } catch (e) {
             console.error('❌ Error fetching CancellationRequests:', e);
             cancellationRequests = [];
@@ -1188,9 +1477,10 @@ app.get('/api/orders', async (req, res) => {
         const database = client.db("MyProductsDb");
         const collection = database.collection("PendingOrders");
         
-        const allOrders = await collection.find({})
-            .sort({ createdAt: -1 })
-            .toArray();
+        const allOrders = await collection.aggregate([
+            { $match: {} },
+            { $sort: { createdAt: -1 } }
+        ], { allowDiskUse: true }).toArray();
         
         if (allOrders.length > 0) {
         }
@@ -1239,12 +1529,15 @@ app.get('/api/orders/with-proof', async (req, res) => {
         const collection = database.collection("PendingOrders");
         
         // Find orders that have proofOfPayment field and it's not null/empty
-        const ordersWithProof = await collection.find({ 
-            proofOfPayment: { $exists: true, $ne: null, $ne: "" },
-            status: { $in: ["active", "Pending", "pending"] }
-        })
-            .sort({ createdAt: -1 })
-            .toArray();
+        const ordersWithProof = await collection.aggregate([
+            { 
+                $match: { 
+                    proofOfPayment: { $exists: true, $ne: null, $ne: "" },
+                    status: { $in: ["active", "Pending", "pending"] }
+                }
+            },
+            { $sort: { createdAt: -1 } }
+        ], { allowDiskUse: true }).toArray();
         
         
         // Format orders for staff review
@@ -1586,7 +1879,10 @@ app.get('/api/user-addresses', async (req, res) => {
             query.email = email;
         }
         
-        const addresses = await collection.find(query).sort({ createdAt: -1 }).toArray();
+        const addresses = await collection.aggregate([
+            { $match: query },
+            { $sort: { createdAt: -1 } }
+        ], { allowDiskUse: true }).toArray();
         res.json(addresses);
     } catch (error) {
         console.error('Error fetching user addresses:', error);
@@ -1914,9 +2210,10 @@ app.get('/api/orders/walkin', async (req, res) => {
         const database = client.db("MyProductsDb");
         const collection = database.collection("WalkInOrders");
         
-        const walkInOrders = await collection.find({})
-            .sort({ createdAt: -1 })
-            .toArray();
+        const walkInOrders = await collection.aggregate([
+            { $match: {} },
+            { $sort: { createdAt: -1 } }
+        ], { allowDiskUse: true }).toArray();
         
         
         res.json(walkInOrders);
@@ -2391,9 +2688,10 @@ app.get('/api/orders/returned', async (req, res) => {
         const returnedOrdersCollection = database.collection("ReturnedOrders");
 
         // Get all returned orders, sorted by most recent first
-        const returnedOrders = await returnedOrdersCollection.find({})
-            .sort({ returnedAt: -1 })
-            .toArray();
+        const returnedOrders = await returnedOrdersCollection.aggregate([
+            { $match: {} },
+            { $sort: { returnedAt: -1 } }
+        ], { allowDiskUse: true }).toArray();
 
         // Format the returned orders with documentation info
         const formattedOrders = returnedOrders.map(order => ({
@@ -2752,9 +3050,10 @@ app.get('/api/orders/cancellation-requests', async (req, res) => {
         const database = client.db("MyProductsDb");
         const cancellationRequestsCollection = database.collection("CancellationRequests");
 
-        const cancellationRequests = await cancellationRequestsCollection.find({})
-            .sort({ submittedAt: -1 })
-            .toArray();
+        const cancellationRequests = await cancellationRequestsCollection.aggregate([
+            { $match: {} },
+            { $sort: { submittedAt: -1 } }
+        ], { allowDiskUse: true }).toArray();
 
 
         res.json({
@@ -2778,8 +3077,7 @@ app.put('/api/orders/return-request/:requestId', async (req, res) => {
     try {
         const { ObjectId } = require('mongodb');
         const { requestId } = req.params;
-        const { action, staffNotes } = req.body; // action: 'approve' or 'reject'
-
+        const { action, staffNotes, returnImage } = req.body; // action: 'approve' or 'reject'
 
         if (!['approve', 'reject'].includes(action)) {
             return res.status(400).json({
@@ -2790,9 +3088,12 @@ app.put('/api/orders/return-request/:requestId', async (req, res) => {
 
         const database = client.db("MyProductsDb");
         const returnRequestsCollection = database.collection("ReturnRequests");
+        const returnedOrdersCollection = database.collection("ReturnedOrders");
+
+        const requestObjectId = new ObjectId(requestId);
 
         // Find the return request
-        const returnRequest = await returnRequestsCollection.findOne({ _id: new ObjectId(requestId) });
+        const returnRequest = await returnRequestsCollection.findOne({ _id: requestObjectId });
 
         if (!returnRequest) {
             return res.status(404).json({
@@ -2801,59 +3102,141 @@ app.put('/api/orders/return-request/:requestId', async (req, res) => {
             });
         }
 
-        // Update the return request status
-        const updateData = {
-            status: action === 'approve' ? 'approved' : 'rejected',
-            processedAt: new Date(),
-            processedBy: 'staff',
-            staffNotes: staffNotes || ''
-        };
-
-        await returnRequestsCollection.updateOne(
-            { _id: new ObjectId(requestId) },
-            { $set: updateData }
-        );
-
-        // If approved, move the original order to ReturnedOrders collection
-        if (action === 'approve') {
-            // Find and move the original order to ReturnedOrders
-            const collections = [
-                { name: 'DeliveredOrders', collection: database.collection("DeliveredOrders") },
-                { name: 'AcceptedOrders', collection: database.collection("AcceptedOrders") }
-            ];
-
-            for (const { collection } of collections) {
-                const originalOrder = await collection.findOne({ _id: new ObjectId(returnRequest.originalOrderId) });
-                if (originalOrder) {
-                    // Move to ReturnedOrders
-                    const returnedOrder = {
-                        ...originalOrder,
-                        returnReason: returnRequest.reason,
-                        returnType: returnRequest.returnType,
-                        returnImage: returnRequest.returnImage,
-                        returnedAt: new Date(),
-                        returnProcessedBy: 'staff',
-                        returnRequestId: requestId
-                    };
-
-                    delete returnedOrder._id; // Remove _id for new document
-
-                    const returnedCollection = database.collection("ReturnedOrders");
-                    await returnedCollection.insertOne(returnedOrder);
-
-                    // Remove from original collection
-                    await collection.deleteOne({ _id: new ObjectId(returnRequest.originalOrderId) });
-
+        // Gather original order details (if still present in any collection)
+        const orderCollections = [
+            database.collection("DeliveredOrders"),
+            database.collection("AcceptedOrders"),
+            database.collection("PendingOrders"),
+            database.collection("Orders")
+        ];
+        let originalOrder = null;
+        let originalOrderCollectionName = null;
+        for (const collection of orderCollections) {
+            try {
+                const found = await collection.findOne({ _id: new ObjectId(returnRequest.originalOrderId) });
+                if (found) {
+                    originalOrder = found;
+                    originalOrderCollectionName = collection.collectionName;
                     break;
                 }
+            } catch (err) {
+                // Ignore invalid ObjectId or not found
             }
         }
 
+        const processedAt = new Date();
+        const decisionStatus = action === 'approve' ? 'accepted' : 'rejected';
+
+        const archivedRecord = {
+            requestId: requestObjectId,
+            status: decisionStatus,
+            action,
+            staffNotes: staffNotes || '',
+            staffDecisionImage: returnImage || null,
+            originalOrderId: returnRequest.originalOrderId || null,
+            orderNumber: returnRequest.orderNumber || originalOrder?.orderNumber || (returnRequest.originalOrderId ? `ORD-${String(returnRequest.originalOrderId).slice(-6)}` : null),
+            customerName: returnRequest.customerName || originalOrder?.fullName || originalOrder?.customerName || originalOrder?.buyerinfo || 'N/A',
+            customerEmail: returnRequest.customerEmail || originalOrder?.email || 'N/A',
+            customerPhone: returnRequest.customerPhone || originalOrder?.phoneNumber || 'N/A',
+            returnType: returnRequest.returnType || 'return',
+            customerReason: returnRequest.reason || returnRequest.returnReason || '',
+            selectedItems: returnRequest.selectedItems || returnRequest.itemsordered || originalOrder?.itemsordered || [],
+            customerImage: returnRequest.returnImage || null,
+            staffDecision: decisionStatus,
+            originalOrderCollection: originalOrderCollectionName,
+            submittedAt: returnRequest.submittedAt || returnRequest.createdAt || processedAt,
+            processedAt,
+            processedBy: 'staff',
+            requestSnapshot: returnRequest,
+            originalOrderSnapshot: originalOrder || null
+        };
+
+        const archiveResult = await returnedOrdersCollection.insertOne(archivedRecord);
+        if (!archiveResult.acknowledged) {
+            throw new Error('Failed to archive return request');
+        }
+
+        // Remove the original return request only after successful archive
+        const deleteResult = await returnRequestsCollection.deleteOne({ _id: requestObjectId });
+        if (deleteResult.deletedCount === 0) {
+            await returnedOrdersCollection.deleteOne({ _id: archiveResult.insertedId }).catch(() => {});
+            throw new Error('Failed to remove original return request');
+        }
+
+        // If the return was accepted and we located the original order, remove it from its collection
+        if (action === 'approve' && originalOrder && originalOrderCollectionName) {
+            const sourceCollection = database.collection(originalOrderCollectionName);
+            await sourceCollection.deleteOne({ _id: new ObjectId(returnRequest.originalOrderId) }).catch(() => {});
+        }
+
+        // Create notifications for both user and staff
+        const userId = returnRequest.userId || originalOrder?.userId || originalOrder?.customerId || null;
+        const orderNumber = archivedRecord.orderNumber;
+        const customerName = archivedRecord.customerName;
+
+        // Create user notification
+        if (userId) {
+            try {
+                const userNotificationsCollection = database.collection("UserNotifications");
+                const isAccepted = action === 'approve';
+                const userNotification = {
+                    userId: userId,
+                    title: isAccepted ? '↩️ Return Request Approved' : '🚫 Return Request Rejected',
+                    message: isAccepted 
+                        ? `Your return request for order ${orderNumber} has been approved. ${staffNotes ? `Staff notes: ${staffNotes}` : 'We will begin processing the return shortly.'}`
+                        : `Your return request for order ${orderNumber} has been rejected. ${staffNotes ? `Reason: ${staffNotes}` : 'Please contact us if you would like to discuss this decision.'}`,
+                    type: isAccepted ? 'order_return_approved' : 'order_return_rejected',
+                    orderId: returnRequest.originalOrderId || null,
+                    orderNumber: orderNumber,
+                    requestId: requestId,
+                    returnType: archivedRecord.returnType,
+                    staffNotes: staffNotes || null,
+                    read: false,
+                    createdAt: processedAt
+                };
+
+                await userNotificationsCollection.insertOne(userNotification);
+                console.log(`✅ User notification created for return request: ${userNotification.title} (userId: ${userId})`);
+            } catch (error) {
+                console.error("❌ Error creating user notification:", error);
+                // Don't fail the entire request if notification creation fails
+            }
+        }
+
+        // Create staff notification
+        try {
+            const staffNotificationsCollection = database.collection("StaffNotifications");
+            const isAccepted = action === 'approve';
+            const staffNotification = {
+                title: isAccepted ? '✅ Return Request Processed (Approved)' : '❌ Return Request Processed (Rejected)',
+                message: `Return request for order ${orderNumber} (${customerName}) has been ${isAccepted ? 'approved' : 'rejected'}. ${staffNotes ? `Notes: ${staffNotes}` : ''}`,
+                type: isAccepted ? 'return_processed_approved' : 'return_processed_rejected',
+                orderId: returnRequest.originalOrderId || null,
+                orderNumber: orderNumber,
+                requestId: requestId,
+                customerName: customerName,
+                customerEmail: archivedRecord.customerEmail,
+                returnType: archivedRecord.returnType,
+                decision: decisionStatus,
+                staffNotes: staffNotes || null,
+                archivedId: archiveResult.insertedId,
+                read: false,
+                createdAt: processedAt,
+                priority: 'medium'
+            };
+
+            await staffNotificationsCollection.insertOne(staffNotification);
+            console.log(`✅ Staff notification created for return request: ${staffNotification.title}`);
+        } catch (error) {
+            console.error("❌ Error creating staff notification:", error);
+            // Don't fail the entire request if notification creation fails
+        }
 
         res.json({
             success: true,
             message: `Return request ${action}d successfully`,
-            status: updateData.status
+            status: decisionStatus,
+            archivedId: archiveResult.insertedId
         });
 
     } catch (error) {
@@ -3569,9 +3952,10 @@ app.get('/api/staff/notifications', async (req, res) => {
         const staffNotificationsCollection = database.collection("StaffNotifications");
 
         // Get all unread notifications, sorted by creation date (newest first)
-        const notifications = await staffNotificationsCollection.find({ read: false })
-            .sort({ createdAt: -1 })
-            .toArray();
+        const notifications = await staffNotificationsCollection.aggregate([
+            { $match: { read: false } },
+            { $sort: { createdAt: -1 } }
+        ], { allowDiskUse: true }).toArray();
 
 
         res.json({
@@ -3637,10 +4021,11 @@ app.get('/api/staff/notifications/all', async (req, res) => {
         const staffNotificationsCollection = database.collection("StaffNotifications");
 
         // Get all notifications, sorted by creation date (newest first)
-        const notifications = await staffNotificationsCollection.find({})
-            .sort({ createdAt: -1 })
-            .limit(100) // Limit to last 100 notifications
-            .toArray();
+        const notifications = await staffNotificationsCollection.aggregate([
+            { $match: {} },
+            { $sort: { createdAt: -1 } },
+            { $limit: 100 } // Limit to last 100 notifications
+        ], { allowDiskUse: true }).toArray();
 
 
         res.json({

@@ -14,6 +14,62 @@
     <script src="js/auth.js"></script>
     <script src="js/toast.js"></script>
     <style>
+        /* Force white color for modal headers - must be last to override everything */
+        #orderModal .modal-header h2,
+        #orderModal .modal-header .modal-title,
+        #returnModal .modal-header h2,
+        #returnModal .modal-header .modal-title,
+        .order-modal-content .modal-header h2,
+        .order-modal-content .modal-header .modal-title {
+            color: #ffffff !important;
+        }
+        
+        /* Ensure toast appears above all dialogs and modals */
+        #toast,
+        .toast {
+            z-index: 99999 !important;
+            position: fixed !important;
+        }
+        
+        .with-validation {
+            position: relative;
+        }
+        
+        .validation-bubble {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            margin-top: 0.5rem;
+            padding: 0.5rem 0.75rem;
+            background: #dc3545;
+            color: #fff;
+            font-size: 0.85rem;
+            border-radius: 6px;
+            box-shadow: 0 6px 16px rgba(220, 53, 69, 0.25);
+            z-index: 1100;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            max-width: 260px;
+            line-height: 1.3;
+        }
+        
+        .validation-bubble::before {
+            content: '';
+            position: absolute;
+            top: -6px;
+            left: 16px;
+            border-width: 0 6px 6px 6px;
+            border-style: solid;
+            border-color: transparent transparent #dc3545 transparent;
+        }
+        
+        .validation-bubble .bubble-icon {
+            font-weight: 700;
+            font-size: 0.9rem;
+        }
+    </style>
+    <style>
         /* Collection badges for debugging/clarity */
         .collection-badge {
             display: inline-block;
@@ -1037,7 +1093,7 @@
         
         .return-dialog-content h3 {
             margin: 0 0 1rem 0;
-            color: var(--warning, #f39c12);
+            color: #d68910;
             font-size: 1.5rem;
             font-weight: 600;
         }
@@ -1072,8 +1128,77 @@
         
         .return-dialog-content textarea:focus {
             outline: none;
-            border-color: var(--warning, #f39c12);
-            box-shadow: 0 0 0 3px rgba(243, 156, 18, 0.1);
+            border-color: #d68910;
+            box-shadow: 0 0 0 3px rgba(214, 137, 16, 0.1);
+        }
+
+        .return-decision-options {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1.5rem;
+            padding: 0.5rem 0 0.25rem 0;
+        }
+
+        .return-decision-options .decision-option {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-weight: 500;
+            color: var(--text, #333);
+        }
+
+        .return-decision-options .decision-option input[type="radio"] {
+            accent-color: #d68910;
+            width: 18px;
+            height: 18px;
+        }
+
+        .with-validation.validation-error {
+            border: 1px solid rgba(220, 53, 69, 0.6);
+            border-radius: 8px;
+            padding: 0.75rem;
+            position: relative;
+        }
+
+        .char-counter {
+            margin-top: 0.5rem;
+            font-size: 0.85rem;
+            color: #666;
+            text-align: right;
+        }
+
+        .char-counter span {
+            font-weight: 600;
+        }
+        
+        .char-counter {
+            margin-top: 0.5rem;
+            font-size: 0.85rem;
+            color: #666;
+            text-align: right;
+        }
+        
+        .char-counter span {
+            font-weight: 600;
+        }
+        
+        .return-decision-options {
+            display: flex;
+            gap: 1.5rem;
+            margin-top: 0.5rem;
+        }
+        
+        .return-decision-options .decision-option {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-weight: 500;
+            color: var(--text, #333);
+        }
+        
+        .return-decision-options .decision-option input[type="radio"] {
+            width: 18px;
+            height: 18px;
         }
         
         .return-drop-zone {
@@ -1092,19 +1217,19 @@
         }
         
         .return-drop-zone:hover {
-            border-color: var(--warning, #f39c12);
-            background: rgba(243, 156, 18, 0.05);
+            border-color: #d68910;
+            background: rgba(214, 137, 16, 0.05);
         }
         
         .return-drop-zone.dragover {
-            border-color: var(--warning, #f39c12);
-            background: rgba(243, 156, 18, 0.1);
+            border-color: #d68910;
+            background: rgba(214, 137, 16, 0.1);
             transform: scale(1.02);
         }
         
         .return-note {
-            background: rgba(243, 156, 18, 0.1);
-            border: 1px solid rgba(243, 156, 18, 0.2);
+            background: rgba(214, 137, 16, 0.1);
+            border: 1px solid rgba(214, 137, 16, 0.2);
             border-radius: 8px;
             padding: 1rem;
             margin-bottom: 1.5rem;
@@ -1112,7 +1237,7 @@
         
         .return-note p {
             margin: 0;
-            color: var(--warning, #f39c12);
+            color: #d68910;
             font-size: 0.9rem;
         }
         
@@ -1143,12 +1268,12 @@
         }
         
         .return-dialog-actions .action-btn.primary {
-            background: var(--warning, #f39c12);
+            background: #d68910;
             color: white;
         }
         
         .return-dialog-actions .action-btn.primary:hover {
-            background: var(--warning-dark, #e67e22);
+            background: #b9770e;
         }
         
         @media (max-width: 480px) {
@@ -1217,7 +1342,7 @@
                         <span class="nav-icon">📦</span>
                         <span class="nav-text">Product Management</span>
                     </button>
-                    <button class="nav-item" data-section="orders" id="ordersNavButton" title="No actions required">
+                    <button class="nav-item" data-section="orders" id="ordersNavButton">
                         <span class="nav-icon">📋</span>
                         <span class="nav-text">Order Management</span>
                         <span class="nav-badge" id="ordersBadge">0</span>
@@ -1393,6 +1518,7 @@
                                 <option value="pending">Pending</option>
                                 <option value="approved">Approved</option>
                                 <option value="delivered">Delivered</option>
+                                <option value="returned">Returned</option>
                                 <option value="completed">Walk-in/Completed</option>
                             </select>
                             <select id="paymentMethodFilter" class="form-control payment-filter-select">
@@ -1613,7 +1739,7 @@
             
             <!-- Header -->
             <div class="modal-header">
-                <h2 class="modal-title">Order Details</h2>
+                <h2 class="modal-title" style="color: white !important;">Order Details</h2>
             </div>
             
             <div class="order-details-form">
@@ -1696,7 +1822,7 @@
             
             <!-- Header -->
             <div class="modal-header">
-                <h2 class="modal-title">Return Request Details</h2>
+                <h2 class="modal-title" style="color: white !important;">Return Request Details</h2>
             </div>
             
             <div class="order-details-form">
@@ -1902,12 +2028,28 @@
         <div class="return-dialog-content">
             <h3>Process Order Return</h3>
             <p>Are you sure you want to process this order as returned? Please upload an image of the returned item(s) for documentation.</p>
-            <div class="form-group">
-                <label for="returnReason">Reason for return (optional):</label>
-                <textarea id="returnReason" class="form-control" rows="3" placeholder="Enter reason for return..."></textarea>
+            <div class="form-group with-validation" id="returnDecisionGroup">
+                <label>Return decision <span style="color: #dc3545;">*</span>:</label>
+                <div class="return-decision-options">
+                    <label class="decision-option">
+                        <input type="radio" name="returnDecision" value="accept">
+                        Accept return
+                    </label>
+                    <label class="decision-option">
+                        <input type="radio" name="returnDecision" value="reject">
+                        Reject return
+                    </label>
             </div>
-            <div class="form-group">
-                <label>Return Documentation Image:</label>
+            </div>
+            <div class="form-group with-validation">
+                <label for="returnReason">Reason for acceptance/rejection <span style="color: #dc3545;">*</span> (15 or more characters):</label>
+                <textarea id="returnReason" class="form-control" rows="3" placeholder="Provide detailed reasoning (15 or more characters)..." required minlength="15"></textarea>
+                <div class="char-counter" id="returnReasonCounter">
+                    <span id="returnReasonCharCount">0</span> / 15+ characters
+                </div>
+            </div>
+            <div class="form-group with-validation">
+                <label>Return Documentation Image <span style="color: #dc3545;">*</span>:</label>
                 <div class="image-upload-section">
                     <div class="return-drop-zone" id="returnDropZone">
                         <div class="drop-zone-content">
@@ -1933,7 +2075,7 @@
     </dialog>
 
     <!-- Toast Container -->
-    <div class="toast" id="toast"></div>
+    <div class="toast" id="toast" style="z-index: 99999 !important;"></div>
 
     <!-- Dashboard Loading Overlay -->
     <div class="dashboard-loading show" id="dashboardLoading">
@@ -2123,6 +2265,205 @@
                 document.getElementById('orderEndDate').value = '';
             }
 
+            // Helper function to format image URL (handles base64, relative paths, and absolute URLs)
+            getImageUrl(image) {
+                if (!image) return 'images/sanrico_logo_1.png';
+                
+                // Normalize backslashes to forward slashes (from Windows paths)
+                image = image.replace(/\\/g, '/');
+                
+                // Base64 images - return as-is
+                if (image.startsWith('data:image')) return image;
+                
+                // Already absolute URL - return as-is
+                if (image.startsWith('http://') || image.startsWith('https://')) return image;
+                
+                // Already starts with 'images/' - return as-is (already correct path)
+                if (image.startsWith('images/')) return image;
+                
+                // Otherwise, add 'images/' prefix
+                return 'images/' + image;
+            }
+
+            // Helper to extract numeric price from various fields
+            extractProductPrice(product) {
+                const toNumber = (val) => {
+                    if (val === null || val === undefined) return NaN;
+                    if (typeof val === 'object' && val.$numberDecimal !== undefined) return parseFloat(val.$numberDecimal);
+                    return parseFloat(val);
+                };
+                const candidates = [product.SellingPrice, product.sellingPrice, product.Price, product.price];
+                for (const candidate of candidates) {
+                    const n = toNumber(candidate);
+                    if (!isNaN(n)) return n;
+                }
+                return 0;
+            }
+
+            normalizeOrderItems(items = []) {
+                return items.map(item => ({
+                    item_name: item.item_name || item.name || 'Unnamed Item',
+                    amount_per_item: item.amount_per_item || item.quantity || 0,
+                    per_item_price: parseFloat(item.per_item_price || item.price_per_item || item.item_price || item.price || 0),
+                    total_item_price: parseFloat(item.total_item_price || item.total_item_price || item.total || 0),
+                    unit: item.unit || ''
+                }));
+            }
+
+            // Normalize raw product from API into dashboard-friendly structure
+            normalizeProduct(rawProduct, options = {}) {
+                return {
+                    id: rawProduct._id,
+                    name: rawProduct.name || 'Unnamed Product',
+                    price: this.extractProductPrice(rawProduct),
+                    category: this.normalizeProductCategory(rawProduct.category),
+                    image: this.getImageUrl(rawProduct.image),
+                    stock: rawProduct.stockQuantity !== undefined ? rawProduct.stockQuantity : (rawProduct.stock || 0),
+                    description: rawProduct.description || 'No description available.',
+                    isActive: rawProduct.isActive !== undefined ? rawProduct.isActive : true,
+                    createdAt: rawProduct.createdAt || null,
+                    fullDetailsLoaded: options.fullDetailsLoaded || !!rawProduct.description
+                };
+            }
+
+            async ensureFullProductDetails(product) {
+                if (!product || product.fullDetailsLoaded) return product;
+
+                try {
+                    const response = await fetch(`http://localhost:3000/api/products/${product.id}`);
+                    if (!response.ok) {
+                        throw new Error('Failed to fetch product details');
+                    }
+
+                    const detailedProduct = await response.json();
+                    product.price = this.extractProductPrice(detailedProduct);
+                    product.category = this.normalizeProductCategory(detailedProduct.category);
+                    product.image = this.getImageUrl(detailedProduct.image);
+                    product.stock = detailedProduct.stockQuantity !== undefined ? detailedProduct.stockQuantity : product.stock;
+                    product.description = detailedProduct.description || product.description;
+                    product.isActive = detailedProduct.isActive !== undefined ? detailedProduct.isActive : product.isActive;
+                    product.createdAt = detailedProduct.createdAt || product.createdAt;
+                    product.fullDetailsLoaded = true;
+                } catch (error) {
+                    console.error('Error loading full product details:', error);
+                }
+
+                return product;
+            }
+
+            normalizeOrder(rawOrder) {
+                return {
+                    _id: rawOrder._id,
+                    id: rawOrder._id,
+                    orderNumber: rawOrder.orderNumber || this.generateOrderNumber(rawOrder),
+                    buyerinfo: rawOrder.buyerinfo || rawOrder.fullName || 'N/A',
+                    fullName: rawOrder.fullName || rawOrder.buyerinfo || 'N/A',
+                    email: rawOrder.email || '',
+                    phoneNumber: rawOrder.phoneNumber || '',
+                    total: parseFloat(rawOrder.total) || 0,
+                    status: rawOrder.status || 'pending',
+                    displayStatus: rawOrder.displayStatus || rawOrder.status || 'pending',
+                    collection: rawOrder.collection || 'pending',
+                    isReturned: rawOrder.isReturned || rawOrder.collection === 'returned' || false,
+                    paymentMethod: rawOrder.paymentMethod || 'cod',
+                    paymentType: rawOrder.paymentType || '',
+                    paymentAmount: rawOrder.paymentAmount || 0,
+                    paymentSplitPercent: rawOrder.paymentSplitPercent || null,
+                    changeUponDelivery: rawOrder.changeUponDelivery || false,
+                    paymentVerified: rawOrder.paymentVerified !== undefined ? rawOrder.paymentVerified : null,
+                    address: rawOrder.address || null,
+                    notes: rawOrder.notes || '',
+                    createdAt: rawOrder.createdAt || rawOrder.orderDate || rawOrder.original_date || null,
+                    orderDate: rawOrder.orderDate || null,
+                    original_date: rawOrder.original_date || null,
+                    itemsordered: this.normalizeOrderItems(rawOrder.itemsordered || []),
+                    deliveryFee: rawOrder.deliveryFee || 0,
+                    serviceFee: rawOrder.serviceFee || 0,
+                    hasProofOfPayment: rawOrder.hasProofOfPayment !== undefined ? rawOrder.hasProofOfPayment : !!rawOrder.proofOfPayment,
+                    proofOfPayment: rawOrder.proofOfPayment || null,
+                    fullDetailsLoaded: !!rawOrder.proofOfPayment || !rawOrder.hasProofOfPayment
+                };
+            }
+
+            async ensureFullOrderDetails(order) {
+                if (!order || order.fullDetailsLoaded) return order;
+
+                try {
+                    const response = await fetch(`http://localhost:3000/api/orders/details/${order._id}`);
+                    if (!response.ok) {
+                        throw new Error('Failed to fetch order details');
+                    }
+
+                    const detailedOrder = await response.json();
+                    
+                    // For returned orders, merge data from originalOrderSnapshot if available
+                    if (detailedOrder.collection === 'returned' && detailedOrder.originalOrderSnapshot) {
+                        const original = detailedOrder.originalOrderSnapshot;
+                        // Merge original order data with return-specific data
+                        order.status = original.status || detailedOrder.status || order.status;
+                        order.displayStatus = 'returned';
+                        order.collection = 'returned';
+                        order.isReturned = true;
+                        order.itemsordered = this.normalizeOrderItems(original.itemsordered || detailedOrder.itemsordered || order.itemsordered);
+                        order.fullName = original.fullName || detailedOrder.fullName || order.fullName;
+                        order.buyerinfo = original.buyerinfo || detailedOrder.buyerinfo || order.buyerinfo;
+                        order.email = original.email || detailedOrder.email || order.email;
+                        order.phoneNumber = original.phoneNumber || detailedOrder.phoneNumber || order.phoneNumber;
+                        order.address = original.address || detailedOrder.address || order.address;
+                        order.delivery_address = original.delivery_address || detailedOrder.delivery_address || order.delivery_address;
+                        order.total = original.total || detailedOrder.total || order.total;
+                        order.subtotal = original.subtotal || detailedOrder.subtotal || order.subtotal;
+                        order.deliveryFee = original.deliveryFee || detailedOrder.deliveryFee || order.deliveryFee;
+                        order.serviceFee = original.serviceFee || detailedOrder.serviceFee || order.serviceFee;
+                        order.paymentMethod = original.paymentMethod || detailedOrder.paymentMethod || order.paymentMethod;
+                        order.paymentType = original.paymentType || detailedOrder.paymentType || order.paymentType;
+                        order.paymentAmount = original.paymentAmount || detailedOrder.paymentAmount || order.paymentAmount;
+                        order.paymentSplitPercent = original.paymentSplitPercent || detailedOrder.paymentSplitPercent || order.paymentSplitPercent;
+                        order.changeUponDelivery = original.changeUponDelivery !== undefined ? original.changeUponDelivery : (detailedOrder.changeUponDelivery !== undefined ? detailedOrder.changeUponDelivery : order.changeUponDelivery);
+                        order.paymentVerified = original.paymentVerified !== undefined ? original.paymentVerified : (detailedOrder.paymentVerified !== undefined ? detailedOrder.paymentVerified : order.paymentVerified);
+                        order.notes = original.notes || detailedOrder.notes || order.notes;
+                        order.createdAt = original.createdAt || detailedOrder.createdAt || order.createdAt;
+                        order.orderDate = original.orderDate || detailedOrder.orderDate || order.orderDate;
+                        order.original_date = original.original_date || detailedOrder.original_date || order.original_date;
+                        order.proofOfPayment = original.proofOfPayment || detailedOrder.proofOfPayment || order.proofOfPayment;
+                        // Return-specific fields
+                        order.returnReason = detailedOrder.customerReason || detailedOrder.returnReason || order.returnReason;
+                        order.returnType = detailedOrder.returnType || order.returnType;
+                        order.returnedAt = detailedOrder.processedAt || detailedOrder.returnedAt || order.returnedAt;
+                        order.returnProcessedBy = detailedOrder.processedBy || detailedOrder.returnProcessedBy || order.returnProcessedBy;
+                        order.staffNotes = detailedOrder.staffNotes || order.staffNotes;
+                        order.staffDecisionImage = detailedOrder.staffDecisionImage || order.staffDecisionImage;
+                        order.customerImage = detailedOrder.customerImage || order.customerImage;
+                        order.returnImage = detailedOrder.customerImage || detailedOrder.returnImage || order.returnImage;
+                    } else {
+                        // Standard order update
+                        order.status = detailedOrder.status || order.status;
+                        order.displayStatus = detailedOrder.displayStatus || order.displayStatus;
+                        order.paymentMethod = detailedOrder.paymentMethod || order.paymentMethod;
+                        order.paymentType = detailedOrder.paymentType || order.paymentType;
+                        order.paymentAmount = detailedOrder.paymentAmount || order.paymentAmount;
+                        order.paymentSplitPercent = detailedOrder.paymentSplitPercent || order.paymentSplitPercent;
+                        order.changeUponDelivery = detailedOrder.changeUponDelivery || order.changeUponDelivery;
+                        order.paymentVerified = detailedOrder.paymentVerified !== undefined ? detailedOrder.paymentVerified : order.paymentVerified;
+                        order.address = detailedOrder.address || order.address;
+                        order.notes = detailedOrder.notes || order.notes;
+                        order.createdAt = detailedOrder.createdAt || order.createdAt;
+                        order.orderDate = detailedOrder.orderDate || order.orderDate;
+                        order.original_date = detailedOrder.original_date || order.original_date;
+                        order.itemsordered = this.normalizeOrderItems(detailedOrder.itemsordered || order.itemsordered);
+                        order.deliveryFee = detailedOrder.deliveryFee || order.deliveryFee;
+                        order.serviceFee = detailedOrder.serviceFee || order.serviceFee;
+                        order.proofOfPayment = detailedOrder.proofOfPayment || order.proofOfPayment;
+                    }
+                    order.hasProofOfPayment = !!order.proofOfPayment;
+                    order.fullDetailsLoaded = true;
+                } catch (error) {
+                    console.error('Error loading full order details:', error);
+                }
+
+                return order;
+            }
+
             // Initialize POS search dropdown functionality
             initializePOSSearchDropdown() {
                 const posSearchContainer = document.querySelector('.pos-search-container');
@@ -2215,7 +2556,7 @@
                 if (matches.length > 0) {
                     this.posSearchDropdown.innerHTML = matches.map(product => `
                         <div class="pos-search-result-item" onclick="staffDashboard.addToCartFromSearch('${product.id}')">
-                            <img src="${product.image.startsWith('data:image') ? product.image : 'images/' + product.image}" 
+                            <img src="${this.getImageUrl(product.image)}" 
                                  alt="${product.name}" 
                                  onerror="this.src='images/sanrico_logo_1.png'">
                             <div class="pos-search-result-info">
@@ -2717,37 +3058,24 @@
                 try {
                     // Use cached products if available
                     if (this._cache.products && this._cache.products.length > 0) {
-                        this.products = this._cache.products;
+                        this.products = this._cache.products.map(product => product.fullDetailsLoaded !== undefined ? product : this.normalizeProduct(product));
                         return;
                     }
 
                     console.log('🔄 Loading products...');
-                    const response = await fetch('http://localhost:3000/api/products');
+                    // Fetch all products for staff dashboard (high limit, no minimal to get all fields including images)
+                    const url = `http://localhost:3000/api/products?limit=10000&skipSort=true&minimal=true&_=${Date.now()}`;
+                    const response = await fetch(url, { cache: 'no-store' });
                     
                     if (!response.ok) throw new Error('Failed to fetch products');
 
                     let products = await response.json();
-                    this.products = products.map(product => ({
-                        id: product._id,
-                        name: product.name,
-                        price: (() => {
-                            const toNumber = (val) => {
-                                if (val === null || val === undefined) return NaN;
-                                if (typeof val === 'object' && val.$numberDecimal !== undefined) return parseFloat(val.$numberDecimal);
-                                return parseFloat(val);
-                            };
-                            const candidates = [product.SellingPrice, product.sellingPrice, product.Price, product.price];
-                            for (const c of candidates) {
-                                const n = toNumber(c);
-                                if (!isNaN(n)) return n;
-                            }
-                            return 0;
-                        })(),
-                        category: this.normalizeProductCategory(product.category),
-                        image: product.image || 'images/sanrico_logo_1.png',
-                        stock: product.stockQuantity || 0,
-                        description: product.description || 'No description available.'
-                    }));
+                    
+                    // Handle both array and object with products property
+                    if (!Array.isArray(products) && products.products) {
+                        products = products.products;
+                    }
+                    this.products = products.map(product => this.normalizeProduct(product, { fullDetailsLoaded: !!product.description }));
 
                     // Cache the processed products
                     this._cache.products = this.products;
@@ -2764,27 +3092,40 @@
                     // Use cached orders if available (even if empty)
                     if (this._cache.orders !== undefined && this._cache.orders !== null) {
                         console.log('📊 Using cached orders:', this._cache.orders.length);
-                        this.orders = Array.isArray(this._cache.orders) ? this._cache.orders : [];
+                        this.orders = Array.isArray(this._cache.orders) 
+                            ? this._cache.orders.map(order => order.hasProofOfPayment !== undefined ? order : this.normalizeOrder(order))
+                            : [];
                         
                         // Update tab badge with total orders count
                         const ordersTabBadge = document.getElementById('ordersTabBadge');
                         if (ordersTabBadge && this.orders) {
                             ordersTabBadge.textContent = this.orders.length;
                         }
+                    
+                    // Update sidebar badge with total count of orders and returns
+                    const ordersBadge = document.getElementById('ordersBadge');
+                    if (ordersBadge) {
+                        const totalOrders = Array.isArray(this.orders) ? this.orders.length : 0;
+                        const totalReturns = Array.isArray(this.returns) ? this.returns.length : 0;
+                        const total = totalOrders + totalReturns;
+                        console.log('🔄 Updating badge - Orders:', totalOrders, 'Returns:', totalReturns, 'Total:', total);
+                        ordersBadge.textContent = total;
+                    }
                         
                         return;
                     }
 
                     console.log('🔄 Loading orders from API...');
                     // Fetch orders from all collections (pending, accepted, delivered)
-                    const response = await fetch('http://localhost:3000/api/orders/all-staff');
+                    const ordersUrl = `http://localhost:3000/api/orders/all-staff?minimal=true&limit=1000&_=${Date.now()}`;
+                    const response = await fetch(ordersUrl, { cache: 'no-store' });
                     
                     if (!response.ok) {
                         throw new Error('Failed to fetch orders');
                     }
 
                     const data = await response.json();
-                    this.orders = Array.isArray(data) ? data : [];
+                    this.orders = Array.isArray(data) ? data.map(order => this.normalizeOrder(order)) : [];
                     console.log('📊 Orders loaded from API:', this.orders.length);
                     
                     // Cache the orders
@@ -2796,6 +3137,16 @@
                     if (ordersTabBadge) {
                         const totalOrders = Array.isArray(this.orders) ? this.orders.length : 0;
                         ordersTabBadge.textContent = totalOrders;
+                    }
+                    
+                    // Update sidebar badge with total count of orders and returns
+                    const ordersBadge = document.getElementById('ordersBadge');
+                    if (ordersBadge) {
+                        const totalOrders = Array.isArray(this.orders) ? this.orders.length : 0;
+                        const totalReturns = Array.isArray(this.returns) ? this.returns.length : 0;
+                        const total = totalOrders + totalReturns;
+                        console.log('🔄 Updating badge - Orders:', totalOrders, 'Returns:', totalReturns, 'Total:', total);
+                        ordersBadge.textContent = total;
                     }
 
                     this.checkForNewOrders();
@@ -2814,6 +3165,17 @@
                     if (this._cache.returns !== undefined && this._cache.returns !== null) {
                         console.log('📦 Using cached returns:', this._cache.returns.length);
                         this.returns = Array.isArray(this._cache.returns) ? this._cache.returns : [];
+                        
+                        // Update sidebar badge with total count of orders and returns
+                        const ordersBadge = document.getElementById('ordersBadge');
+                        if (ordersBadge) {
+                            const totalOrders = Array.isArray(this.orders) ? this.orders.length : 0;
+                            const totalReturns = Array.isArray(this.returns) ? this.returns.length : 0;
+                            const total = totalOrders + totalReturns;
+                            console.log('🔄 Updating badge (from returns cache) - Orders:', totalOrders, 'Returns:', totalReturns, 'Total:', total);
+                            ordersBadge.textContent = total;
+                        }
+                        
                         return;
                     }
 
@@ -2849,6 +3211,16 @@
                     if (returnsTabBadge) {
                         const totalReturns = Array.isArray(this.returns) ? this.returns.length : 0;
                         returnsTabBadge.textContent = totalReturns;
+                    }
+                    
+                    // Update sidebar badge with total count of orders and returns
+                    const ordersBadge = document.getElementById('ordersBadge');
+                    if (ordersBadge) {
+                        const totalOrders = Array.isArray(this.orders) ? this.orders.length : 0;
+                        const totalReturns = Array.isArray(this.returns) ? this.returns.length : 0;
+                        const total = totalOrders + totalReturns;
+                        console.log('🔄 Updating badge - Orders:', totalOrders, 'Returns:', totalReturns, 'Total:', total);
+                        ordersBadge.textContent = total;
                     }
 
                 } catch (error) {
@@ -3042,16 +3414,18 @@
                     document.getElementById('completedOrders').textContent = deliveredOrders;
                     document.getElementById('deliveredProducts').textContent = deliveredProducts;
                     
-                    // Update badge with actionable orders count or "0 action/s required"
+                    // Update badge with total count of orders and returns
                     const ordersBadge = document.getElementById('ordersBadge');
-                    ordersBadge.textContent = ordersRequiringAction;
+                    const totalOrders = Array.isArray(this.orders) ? this.orders.length : 0;
+                    const totalReturns = Array.isArray(this.returns) ? this.returns.length : 0;
+                    ordersBadge.textContent = totalOrders + totalReturns;
                     
                     // Update tooltip text dynamically on the nav button
                     const ordersNavButton = document.getElementById('ordersNavButton');
                     if (ordersRequiringAction === 0) {
                         ordersNavButton.title = 'No actions required';
                     } else {
-                        ordersNavButton.title = `${ordersRequiringAction} action${ordersRequiringAction > 1 ? 's' : ''} required`;
+                        ordersNavButton.title = 'Actions are needed for our orders';
                     }
                     
                     document.getElementById('totalRevenue').textContent = formatPrice(totalRevenue);
@@ -3114,16 +3488,18 @@
                     document.getElementById('completedOrders').textContent = completedOrders;
                     document.getElementById('deliveredProducts').textContent = deliveredProducts;
                     
-                    // Update badge with actionable orders count or "0 action/s required"
+                    // Update badge with total count of orders and returns
                     const ordersBadge = document.getElementById('ordersBadge');
-                    ordersBadge.textContent = ordersRequiringAction;
+                    const totalOrders = Array.isArray(this.orders) ? this.orders.length : 0;
+                    const totalReturns = Array.isArray(this.returns) ? this.returns.length : 0;
+                    ordersBadge.textContent = totalOrders + totalReturns;
                     
                     // Update tooltip text dynamically on the nav button
                     const ordersNavButton = document.getElementById('ordersNavButton');
                     if (ordersRequiringAction === 0) {
                         ordersNavButton.title = 'No actions required';
                     } else {
-                        ordersNavButton.title = `${ordersRequiringAction} action${ordersRequiringAction > 1 ? 's' : ''} required`;
+                        ordersNavButton.title = 'Actions are needed for our orders';
                     }
                     
                     document.getElementById('totalRevenue').textContent = formatPrice(totalRevenue);
@@ -3639,6 +4015,7 @@
                         <option value="pending">Pending</option>
                         <option value="approved">Approved</option>
                         <option value="delivered">Delivered</option>
+                        <option value="returned">Returned</option>
                         <option value="completed">Walk-in/Completed</option>
                     `;
                     // Show payment method filter
@@ -3788,7 +4165,7 @@
                 lowStockList.innerHTML = lowStockProducts.map(product => `
                     <div class="low-stock-item" onclick="staffDashboard.editProduct('${product.id}')">
                         <div class="low-stock-image">
-                            <img src="${product.image.startsWith('data:image') ? product.image : 'images/' + product.image}"
+                            <img src="${this.getImageUrl(product.image)}"
                                  alt="${product.name}"
                                  onerror="this.src='images/sanrico_logo_1.png'">
                             <div class="low-stock-image-overlay">
@@ -3839,7 +4216,7 @@
                     <tr>
                         <td>
                             <div class="product-image-cell">
-                                <img src="${product.image.startsWith('data:image') ? product.image : 'images/' + product.image}" 
+                                <img src="${this.getImageUrl(product.image)}" 
                                      alt="${product.name}" 
                                      onerror="this.src='images/sanrico_logo_1.png'"
                                      class="product-table-image">
@@ -3903,6 +4280,22 @@
                 console.log('🔍 Rendering orders with filter:', statusFilter);
                 console.log('📊 Total orders before filtering:', this.orders.length);
                 
+                // Debug: Log returned orders
+                if (statusFilter === 'returned') {
+                    const returnedOrders = this.orders.filter(o => {
+                        const displayStatus = o.displayStatus || o.status;
+                        return displayStatus === 'returned' || o.collection === 'returned' || o.isReturned === true;
+                    });
+                    console.log('🔄 Found returned orders:', returnedOrders.length);
+                    console.log('🔄 Returned orders details:', returnedOrders.map(o => ({
+                        _id: o._id,
+                        displayStatus: o.displayStatus,
+                        status: o.status,
+                        collection: o.collection,
+                        isReturned: o.isReturned
+                    })));
+                }
+                
                 let filteredOrders = this.orders;
                 
                 // Filter by search query first
@@ -3923,6 +4316,22 @@
                 if (statusFilter !== 'all') {
                     filteredOrders = filteredOrders.filter(o => {
                         const displayStatus = o.displayStatus || o.status;
+                        
+                        // Special handling for returned orders
+                        if (statusFilter === 'returned') {
+                            return displayStatus === 'returned' || 
+                                   o.collection === 'returned' || 
+                                   o.isReturned === true;
+                        }
+                        
+                        // Special handling for completed/walk-in orders
+                        if (statusFilter === 'completed') {
+                            return displayStatus === 'completed' || 
+                                   o.collection === 'walkin' || 
+                                   displayStatus === 'walk-in';
+                        }
+                        
+                        // Standard status matching
                         return displayStatus === statusFilter;
                     });
                 }
@@ -3970,7 +4379,10 @@
                     let statusClass = statusDisplay;
                     
                     // Map status classes for CSS
-                    if (statusDisplay === 'pending' || order.status === 'active') {
+                    if (order.collection === 'returned' || order.isReturned || statusDisplay === 'returned') {
+                        statusClass = 'returned';
+                        statusDisplay = 'Returned';
+                    } else if (statusDisplay === 'pending' || order.status === 'active') {
                         statusClass = 'pending';
                         statusDisplay = 'Pending';
                     } else if (statusDisplay === 'approved') {
@@ -3979,21 +4391,22 @@
                     } else if (statusDisplay === 'delivered') {
                         statusClass = 'delivered';
                         statusDisplay = 'Delivered';
-                    } else if (statusDisplay === 'returned') {
-                        statusClass = 'returned';
-                        statusDisplay = 'Returned';
                     } else if (statusDisplay === 'completed' || order.collection === 'walkin') {
                         statusClass = 'completed';
                         statusDisplay = 'Walk-in/Completed';
                     }
                     
+                    // Check if order is returned - redact all info except order number and status
+                    const isReturned = order.collection === 'returned' || order.isReturned || statusDisplay === 'Returned';
+                    
                     return `
                         <tr data-collection="${order.collection || 'unknown'}">
                             <td>${order.orderNumber || this.generateOrderNumber(order)}</td>
-                            <td>${order.fullName || order.buyerinfo || 'N/A'}</td>
-                            <td>${(order.itemsordered || []).length} items</td>
-                            <td>₱${formatPrice(order.total)}</td>
+                            <td>${isReturned ? 'RETURNED' : (order.fullName || order.buyerinfo || 'N/A')}</td>
+                            <td>${isReturned ? 'RETURNED' : `${(order.itemsordered || []).length} items`}</td>
+                            <td>${isReturned ? 'RETURNED' : `₱${formatPrice(order.total)}`}</td>
                             <td>
+                                ${isReturned ? 'RETURNED' : `
                                 <div style="font-size: 0.85rem; line-height: 1.2;">
                                     <div style="display: flex; align-items: center; gap: 0.25rem; margin-bottom: 0.2rem;">
                                         <span class="payment-method ${order.paymentMethod || 'cod'}" style="font-size: 0.8rem;">
@@ -4018,14 +4431,17 @@
                                     </div>
                                 ` : ''}
                                 </div>
+                                `}
                             </td>
                             <td>
+                                ${isReturned ? 'RETURNED' : `
                                 <span class="shipping-info">
                                     ${order.address ? 'Delivery' : 'Pickup'}
                                 </span>
+                                `}
                             </td>
                             <td style="font-size: 0.8rem;">
-                                ${new Date(order.orderDate || order.createdAt || order.original_date).toLocaleDateString('en-US', {
+                                ${isReturned ? 'RETURNED' : new Date(order.orderDate || order.createdAt || order.original_date).toLocaleDateString('en-US', {
                                     month: 'short',
                                     day: 'numeric',
                                     year: '2-digit',
@@ -4222,7 +4638,7 @@
                 grid.innerHTML = filteredProducts.map(product => `
                     <div class="pos-product-card" onclick="staffDashboard.addToCart('${product.id}')">
                         <div class="pos-product-image">
-                            <img src="${product.image.startsWith('data:image') ? product.image : 'images/' + product.image}" 
+                            <img src="${this.getImageUrl(product.image)}" 
                                  alt="${product.name}" 
                                  onerror="this.src='images/sanrico_logo_1.png'">
                         </div>
@@ -4274,7 +4690,11 @@
                 grid.innerHTML = filteredProducts.map(product => `
                     <div class="pos-product-card" onclick="staffDashboard.addToCart('${product.id}')">
                         <div class="pos-product-image">
-                            <img src="${product.image.startsWith('data:image') ? product.image : 'images/' + product.image}"
+                            <img src="${this.getImageUrl(product.image)}" 
+                                 alt="${product.name}" 
+                                 onerror="this.src='images/sanrico_logo_1.png'">
+                        <div class="pos-product-image">
+                            <img src="${this.getImageUrl(product.image)}"
                                  alt="${product.name}"
                                  onerror="this.src='images/sanrico_logo_1.png'">
                         </div>
@@ -4344,7 +4764,7 @@
                     cartItems.innerHTML = this.cart.map((item, index) => `
                         <div class="order-item">
                             <div class="order-item-image">
-                                <img src="${item.image.startsWith('data:image') ? item.image : 'images/' + item.image}" 
+                                <img src="${this.getImageUrl(item.image)}"
                                      alt="${item.name}" 
                                      onerror="this.src='images/sanrico_logo_1.png'">
                             </div>
@@ -4605,22 +5025,24 @@
                 const product = this.products.find(p => p.id === id);
                 if (!product) return;
                 
-                this.currentEditingProduct = product;
+                this.ensureFullProductDetails(product).catch(() => product).then((detailedProduct) => {
+                    this.currentEditingProduct = detailedProduct;
                 
-                document.getElementById('productName').value = product.name;
-                document.getElementById('productStock').value = product.stock;
+                    document.getElementById('productName').value = detailedProduct.name;
+                    document.getElementById('productStock').value = detailedProduct.stock;
                 
-                if (product.image && !product.image.includes('sanrico_logo_1.png')) {
+                    if (detailedProduct.image && !detailedProduct.image.includes('sanrico_logo_1.png')) {
                     const previewImg = document.getElementById('previewImg');
                     const imagePreview = document.getElementById('imagePreview');
                     const removeBtn = document.getElementById('removeImageBtn');
                     
-                    previewImg.src = product.image.startsWith('data:image') ? product.image : 'images/' + product.image;
+                        previewImg.src = this.getImageUrl(detailedProduct.image);
                     imagePreview.classList.remove('hidden');
                     removeBtn.classList.remove('hidden');
                 }
                 
                 document.getElementById('productModal').classList.add('show');
+                });
             }
 
             async saveProductChanges() {
@@ -4668,12 +5090,17 @@
                 const order = this.orders.find(o => o._id === orderId);
                 if (!order) return;
                 
-                this.currentEditingOrder = order;
+                this.ensureFullOrderDetails(order).catch(() => order).then((detailedOrder) => {
+                this.currentEditingOrder = detailedOrder;
+                const order = detailedOrder;
+                
+                // Check if order is returned - redact all info except order ID and status
+                const isReturnedOrder = detailedOrder.collection === 'returned' || detailedOrder.displayStatus === 'returned' || detailedOrder.isReturned;
                 
                 // Populate order ID and date with improved formatting
-                const orderNumber = order.orderNumber || this.generateOrderNumber(order);
+                const orderNumber = detailedOrder.orderNumber || this.generateOrderNumber(detailedOrder);
                 document.getElementById('staffModalOrderId').textContent = orderNumber;
-                document.getElementById('staffModalOrderDate').textContent = new Date(order.orderDate || order.createdAt || order.original_date).toLocaleDateString('en-US', {
+                document.getElementById('staffModalOrderDate').textContent = isReturnedOrder ? 'RETURNED' : new Date(detailedOrder.orderDate || detailedOrder.createdAt || detailedOrder.original_date).toLocaleDateString('en-US', {
                     year: 'numeric',
                     month: 'short',
                     day: 'numeric',
@@ -4682,30 +5109,47 @@
                 });
                 
                 // Resolve delivery address if it's an address ID
-                this.resolveDeliveryAddress(order).then((resolvedAddress) => {
+                this.resolveDeliveryAddress(detailedOrder).then((resolvedAddress) => {
                     // Populate customer information with resolved address
                 const customerInfo = document.getElementById('staffCustomerInfo');
-                customerInfo.innerHTML = `
+                customerInfo.innerHTML = isReturnedOrder ? `
                     <div class="info-row">
                         <span class="info-label">Customer Name</span>
-                        <span class="info-value">${order.fullName || order.buyerinfo || 'N/A'}</span>
+                        <span class="info-value">RETURNED</span>
                     </div>
                     <div class="info-row">
                         <span class="info-label">Email</span>
-                        <span class="info-value">${order.email || 'N/A'}</span>
+                        <span class="info-value">RETURNED</span>
                     </div>
                     <div class="info-row">
                         <span class="info-label">Phone</span>
-                        <span class="info-value">${order.phoneNumber || 'N/A'}</span>
+                        <span class="info-value">RETURNED</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Delivery Address</span>
+                        <span class="info-value">RETURNED</span>
+                    </div>
+                ` : `
+                    <div class="info-row">
+                        <span class="info-label">Customer Name</span>
+                        <span class="info-value">${detailedOrder.fullName || detailedOrder.buyerinfo || 'N/A'}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Email</span>
+                        <span class="info-value">${detailedOrder.email || 'N/A'}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Phone</span>
+                        <span class="info-value">${detailedOrder.phoneNumber || 'N/A'}</span>
                     </div>
                     <div class="info-row">
                         <span class="info-label">Delivery Address</span>
                             <span class="info-value">${resolvedAddress || 'Pickup'}</span>
                     </div>
-                    ${order.notes && order.notes !== 'no additional notes' ? `
+                    ${detailedOrder.notes && detailedOrder.notes !== 'no additional notes' ? `
                         <div class="info-row">
                             <span class="info-label">Notes</span>
-                            <span class="info-value">${order.notes}</span>
+                            <span class="info-value">${detailedOrder.notes}</span>
                         </div>
                     ` : ''}
                 `;
@@ -4713,56 +5157,69 @@
                 
                 // Populate order items with modern styling
                 const itemsList = document.getElementById('staffModalOrderItems');
-                itemsList.innerHTML = (order.itemsordered || []).map(item => `
+                itemsList.innerHTML = isReturnedOrder ? `
+                    <div class="order-item-modern">
+                        <div class="item-info-modern">
+                            <div class="item-name-modern">RETURNED</div>
+                            <div class="item-details-modern">RETURNED</div>
+                        </div>
+                        <div class="item-total-modern">RETURNED</div>
+                    </div>
+                ` : (detailedOrder.itemsordered || []).map(item => `
                     <div class="order-item-modern">
                         <div class="item-info-modern">
                             <div class="item-name-modern">${item.item_name || 'Unknown Item'}</div>
-                            <div class="item-details-modern">Qty: ${item.amount_per_item || 1} × ${formatPrice(item.price_per_item) || '₱0.00'}</div>
+                            <div class="item-details-modern">Qty: ${item.amount_per_item || 1} × ${formatPrice(item.per_item_price) || '₱0.00'}</div>
                         </div>
                         <div class="item-total-modern">${formatPrice(item.total_item_price) || '₱0.00'}</div>
                     </div>
                 `).join('');
                 
                 // Calculate and populate totals
-                const subtotal = parseFloat(order.subtotal) || (order.itemsordered || []).reduce((total, item) => total + (parseFloat(item.total_item_price) || 0), 0);
-                const deliveryFee = parseFloat(order.deliveryFee) || 0;
-                const total = parseFloat(order.total) || (subtotal + deliveryFee);
+                if (isReturnedOrder) {
+                    document.getElementById('staffModalSubtotal').textContent = 'RETURNED';
+                    document.getElementById('staffModalDeliveryFee').textContent = 'RETURNED';
+                    document.getElementById('staffModalTotal').textContent = 'RETURNED';
+                } else {
+                    const subtotal = parseFloat(detailedOrder.subtotal) || (detailedOrder.itemsordered || []).reduce((total, item) => total + (parseFloat(item.total_item_price) || 0), 0);
+                    const deliveryFee = parseFloat(detailedOrder.deliveryFee) || 0;
+                    const total = parseFloat(detailedOrder.total) || (subtotal + deliveryFee);
 
                 document.getElementById('staffModalSubtotal').textContent = formatPrice(subtotal);
                 document.getElementById('staffModalDeliveryFee').textContent = formatPrice(deliveryFee);
                 document.getElementById('staffModalTotal').textContent = formatPrice(total);
+                }
                 
                 // Populate staff technical information with better formatting
                 const technicalInfo = document.getElementById('staffOrderTechnicalInfo');
                 technicalInfo.innerHTML = `
                     <div class="info-row">
                         <span class="info-label">Database ID</span>
-                        <span class="info-value technical-value">${order._id || 'N/A'}</span>
+                        <span class="info-value technical-value">${detailedOrder._id || 'N/A'}</span>
                     </div>
                     <div class="info-row">
                         <span class="info-label">User ID</span>
-                        <span class="info-value technical-value">${order.userId || 'N/A'}</span>
+                        <span class="info-value technical-value">${isReturnedOrder ? 'RETURNED' : (detailedOrder.userId || 'N/A')}</span>
                     </div>
                     <div class="info-row">
                         <span class="info-label">Created At</span>
-                        <span class="info-value">${order.createdAt || order.original_date ? new Date(order.createdAt || order.original_date).toLocaleString() : 'N/A'}</span>
+                        <span class="info-value">${isReturnedOrder ? 'RETURNED' : (detailedOrder.createdAt || detailedOrder.original_date ? new Date(detailedOrder.createdAt || detailedOrder.original_date).toLocaleString() : 'N/A')}</span>
                     </div>
                     <div class="info-row">
                         <span class="info-label">Order Source</span>
-                        <span class="info-value">${order.source || 'checkout_page'}</span>
+                        <span class="info-value">${isReturnedOrder ? 'RETURNED' : (detailedOrder.source || 'checkout_page')}</span>
                     </div>
                     <div class="info-row">
                         <span class="info-label">Current Status</span>
                         <span class="info-value">
-                            <span class="staff-status-badge ${(order.status || 'pending').toLowerCase()}">${order.status || 'Pending'}</span>
+                            <span class="staff-status-badge ${(detailedOrder.status || 'pending').toLowerCase()}">${detailedOrder.status || 'Pending'}</span>
                         </span>
                     </div>
                 `;
                 
                 // Populate payment or return information based on order status
                 const paymentInfo = document.getElementById('staffPaymentInfo');
-                const isReturnedOrder = order.collection === 'returned' || order.displayStatus === 'returned';
-                const isWalkInOrder = order.collection === 'walkin' || order.displayStatus === 'completed';
+                const isWalkInOrder = detailedOrder.collection === 'walkin' || detailedOrder.displayStatus === 'completed';
                 
                 // Update section title based on order type
                 const sectionTitle = paymentInfo.closest('.order-card-section').querySelector('.section-title');
@@ -4775,40 +5232,37 @@
                 }
                 
                 if (isReturnedOrder) {
-                    // Display return information
-                    const hasReturnImage = order.returnImage && order.returnImage.trim() !== '';
-                    
+                    // Display return information - all redacted except status
                     paymentInfo.innerHTML = `
                         <div class="payment-method-modern">
                             <div class="payment-icon">↩️</div>
                             <div>
                                 <strong>Order Returned</strong>
-                                ${order.returnedAt ? `<div style="font-size: 0.85rem; color: #666;">Processed: ${new Date(order.returnedAt).toLocaleString()}</div>` : ''}
-                                ${order.returnProcessedBy ? `<div style="font-size: 0.85rem; color: #666;">Processed by: ${order.returnProcessedBy}</div>` : ''}
+                                <div style="font-size: 0.85rem; color: #666;">Processed: RETURNED</div>
+                                <div style="font-size: 0.85rem; color: #666;">Processed by: RETURNED</div>
+                                <div style="font-size: 0.85rem; color: #666;">Decision: RETURNED</div>
                             </div>
                         </div>
                         <div class="info-row">
-                            <span class="info-label">Return Reason</span>
-                            <span class="info-value">${order.returnReason || 'No reason provided'}</span>
+                            <span class="info-label">Return Type</span>
+                            <span class="info-value">RETURNED</span>
                         </div>
                         <div class="info-row">
-                            <span class="info-label">Return Documentation</span>
-                            <span class="info-value">
-                                ${hasReturnImage ? 
-                                    `<span style="color: #28a745; font-weight: 500;">✓ Image Available</span>
-                                     <button type="button" class="proof-preview-btn" onclick="staffDashboard.showReturnImagePreview('${order.returnImage}')">
-                                         <i class="fa fa-eye"></i> View Return Image
-                                     </button>` : 
-                                    `<span style="color: #dc3545; font-weight: 500;">⚠ No Image Uploaded</span>`
-                                }
-                            </span>
+                            <span class="info-label">Customer Reason</span>
+                            <span class="info-value">RETURNED</span>
                         </div>
-                        ${order.returnImageUploadedAt ? `
                             <div class="info-row">
-                                <span class="info-label">Image Uploaded</span>
-                                <span class="info-value">${new Date(order.returnImageUploadedAt).toLocaleString()}</span>
+                            <span class="info-label">Staff Notes</span>
+                            <span class="info-value">RETURNED</span>
                             </div>
-                        ` : ''}
+                        <div class="info-row">
+                            <span class="info-label">Customer Return Documentation</span>
+                            <span class="info-value">RETURNED</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">Staff Documentation</span>
+                            <span class="info-value">RETURNED</span>
+                        </div>
                     `;
                 } else if (isWalkInOrder) {
                     // Display walk-in transaction information (no payment verification needed)
@@ -4840,7 +5294,7 @@
                     `;
                 } else {
                     // Display payment information (original logic for online orders)
-                    const hasProofOfPayment = order.proofOfPayment && order.proofOfPayment.trim() !== '';
+                    const hasProofOfPayment = order.hasProofOfPayment || (order.proofOfPayment && order.proofOfPayment.trim() !== '');
                     
                     paymentInfo.innerHTML = `
                         <div class="payment-method-modern">
@@ -4889,7 +5343,7 @@
                             <span class="info-value">
                                 ${hasProofOfPayment ? 
                                     `<span style="color: #28a745; font-weight: 500;">✓ Proof Available</span>
-                                     <button type="button" class="proof-preview-btn" onclick="staffDashboard.showProofPreview('${order.proofOfPayment}')">
+                                     <button type="button" class="proof-preview-btn" onclick="staffDashboard.showProofPreview('${order._id}')">
                                          <i class="fa fa-eye"></i> Preview Proof
                                      </button>` : 
                                     `<span style="color: #dc3545; font-weight: 500;">⚠ No Proof Uploaded</span>`
@@ -4912,6 +5366,7 @@
                 // Update button visibility based on current order status
                 this.updateStatusButtonVisibility(order);
                 document.getElementById('orderModal').classList.add('show');
+                });
             }
 
             // Update button visibility and states based on current order status
@@ -4940,6 +5395,11 @@
                 // Walk-in orders are already completed - no status changes allowed
                 if (effectiveStatus === 'completed') {
                     return; // No buttons shown for walk-in orders
+                }
+                
+                // Returned orders are view-only - no status changes allowed
+                if (effectiveStatus === 'returned' || order.collection === 'returned' || order.isReturned) {
+                    return; // No buttons shown for returned orders
                 }
                 
                 // Show buttons based on current status for other order types
@@ -5114,7 +5574,15 @@
             }
 
             // Method to show proof of payment preview
-            showProofPreview(proofUrl) {
+            showProofPreview(orderId) {
+                const order = this.orders.find(o => o._id === orderId);
+                if (!order) {
+                    showToast('Order not found', 'error');
+                    return;
+                }
+                
+                this.ensureFullOrderDetails(order).catch(() => order).then((detailedOrder) => {
+                    const proofUrl = detailedOrder.proofOfPayment;
                 if (!proofUrl) {
                     showToast('No proof of payment available', 'warning');
                     return;
@@ -5136,6 +5604,7 @@
                 `;
                 
                 document.body.appendChild(modal);
+                });
             }
 
             // Method to show return image preview
@@ -5739,7 +6208,32 @@
                 
                 const dialog = document.getElementById('orderReturnDialog');
                 // Clear any previous data
-                document.getElementById('returnReason').value = '';
+                const returnReasonField = document.getElementById('returnReason');
+                returnReasonField.value = '';
+                returnReasonField.style.borderColor = '';
+                returnReasonField.style.boxShadow = '';
+                const charCountEl = document.getElementById('returnReasonCharCount');
+                if (charCountEl) {
+                    charCountEl.textContent = '0';
+                }
+                const charCounterEl = document.getElementById('returnReasonCounter');
+                if (charCounterEl) {
+                    charCounterEl.style.color = '#666';
+                }
+                this.clearValidationBubble(returnReasonField);
+                
+                // Reset decision to default (accept)
+                const decisionRadios = Array.from(dialog.querySelectorAll('input[name="returnDecision"]'));
+                decisionRadios.forEach((radio, index) => {
+                    radio.checked = index === 0;
+                });
+                const decisionGroup = document.getElementById('returnDecisionGroup');
+                if (decisionGroup) {
+                    decisionGroup.classList.remove('validation-error');
+                    this.clearValidationBubble(decisionGroup);
+                }
+                
+                // Reset image field and associated validation
                 this.clearReturnImage();
                 dialog.showModal();
             }
@@ -5747,6 +6241,13 @@
             // Setup order return dialog
             setupOrderReturnDialog() {
                 const dialog = document.getElementById('orderReturnDialog');
+                const form = dialog.querySelector('.return-dialog-actions');
+                const confirmButton = form.querySelector('button[value="confirm"]');
+                const returnReasonEl = document.getElementById('returnReason');
+                const dropZone = document.getElementById('returnDropZone');
+                const fileInput = document.getElementById('returnFileInput');
+                const decisionGroup = document.getElementById('returnDecisionGroup');
+                const decisionRadios = Array.from(dialog.querySelectorAll('input[name="returnDecision"]'));
                 
                 // Prevent duplicate listeners by checking if already set up
                 if (dialog.dataset.setupComplete === 'true') {
@@ -5754,92 +6255,249 @@
                 }
                 dialog.dataset.setupComplete = 'true';
                 
-                // Add event listener for dialog close
-                dialog.addEventListener('close', () => {
-                    if (dialog.returnValue === 'confirm') {
-                        const returnReason = document.getElementById('returnReason').value.trim();
+                // Intercept the confirm button click to validate before closing
+                confirmButton.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    
+                    const selectedDecision = decisionRadios.find(radio => radio.checked);
+                    const returnReason = returnReasonEl.value.trim();
                         const returnImage = this.getReturnImageData();
-                        this.proceedWithOrderReturn(returnReason, returnImage);
+                    
+                    // Remove any previous error highlighting
+                    returnReasonEl.style.borderColor = '';
+                    returnReasonEl.style.boxShadow = '';
+                    dropZone.style.borderColor = '';
+                    dropZone.style.backgroundColor = '';
+                    this.clearValidationBubble(returnReasonEl);
+                    this.clearValidationBubble(dropZone);
+                    if (decisionGroup) {
+                        this.clearValidationBubble(decisionGroup);
                     }
+                    
+                    if (!selectedDecision) {
+                        if (decisionGroup) {
+                            this.showValidationBubble(decisionGroup, 'Please select whether to accept or reject the return request');
+                        }
+                        return;
+                    }
+                    
+                    const decision = selectedDecision.value === 'reject' ? 'reject' : 'accept';
+                    
+                    // Validate: both reason and image are required
+                    // Check reason first (first field) - must be 15 or more characters
+                    const reasonLength = returnReason.length;
+                    if (!returnReason || reasonLength === 0) {
+                        // Highlight and focus the textarea
+                        returnReasonEl.style.borderColor = '#dc3545';
+                        returnReasonEl.style.boxShadow = '0 0 0 3px rgba(220, 53, 69, 0.25)';
+                        returnReasonEl.focus();
+                        this.showValidationBubble(returnReasonEl, 'Please enter a reason for return (15 or more characters required)');
+                        return;
+                    } else if (reasonLength < 15) {
+                        // Highlight and focus the textarea
+                        returnReasonEl.style.borderColor = '#dc3545';
+                        returnReasonEl.style.boxShadow = '0 0 0 3px rgba(220, 53, 69, 0.25)';
+                        returnReasonEl.focus();
+                        this.showValidationBubble(returnReasonEl, `Reason must be at least 15 characters (currently ${reasonLength} characters)`);
+                        return;
+                    }
+                    
+                    // Check image second
+                    if (decision === 'accept' && !returnImage) {
+                         // Highlight the drop zone
+                         dropZone.style.borderColor = '#dc3545';
+                         dropZone.style.backgroundColor = 'rgba(220, 53, 69, 0.1)';
+                         // Try to focus the file input
+                         if (fileInput) {
+                             fileInput.focus();
+                             // Trigger click to open file picker
+                             setTimeout(() => fileInput.click(), 100);
+                    }
+                         this.showValidationBubble(dropZone, 'Please upload a return documentation image');
+                         return;
+                     }
+                    
+                    // If both are provided, close dialog and proceed
+                    dialog.close();
+                    this.handleReturnDecision(decision, returnReason, returnImage);
                 });
+                
+                // Handle cancel button
+                const cancelButton = form.querySelector('button[value="cancel"]');
+                cancelButton.addEventListener('click', () => {
+                    dialog.close();
+                });
+                
+                // Clear error highlighting when user starts typing and update character counter
+                const charCountEl = document.getElementById('returnReasonCharCount');
+                const charCounterEl = document.getElementById('returnReasonCounter');
+                returnReasonEl.addEventListener('input', () => {
+                    const length = returnReasonEl.value.length;
+                    if (charCountEl) {
+                        charCountEl.textContent = length;
+                        // Update color based on character count
+                        if (length < 15) {
+                            charCounterEl.style.color = '#dc3545';
+                        } else {
+                            charCounterEl.style.color = '#28a745';
+                        }
+                    }
+                    if (returnReasonEl.style.borderColor === 'rgb(220, 53, 69)') {
+                        returnReasonEl.style.borderColor = '';
+                        returnReasonEl.style.boxShadow = '';
+                    }
+                    this.clearValidationBubble(returnReasonEl);
+                });
+                
+                decisionRadios.forEach(radio => {
+                    radio.addEventListener('change', () => {
+                        if (decisionGroup) {
+                            this.clearValidationBubble(decisionGroup);
+                        }
+                    });
+                });
+                
+                // Clear error highlighting when user uploads image
+                if (fileInput) {
+                    fileInput.addEventListener('change', () => {
+                        if (dropZone && dropZone.style.borderColor === 'rgb(220, 53, 69)') {
+                            dropZone.style.borderColor = '';
+                            dropZone.style.backgroundColor = '';
+                        }
+                        this.clearValidationBubble(dropZone);
+                    });
+                }
 
                 // Setup drag and drop for return image
                 this.setupReturnImageUpload();
             }
 
             // Handle the actual order return with reason and image
-            proceedWithOrderReturn(returnReason = '', returnImage = null) {
+            async handleReturnDecision(decision, returnReason = '', returnImage = null) {
                 if (!this.currentEditingOrder) return;
                 
-                // Send notification to the user about order return
-                this.sendOrderReturnNotification(this.currentEditingOrder, returnReason);
+                const returnRequest = this.currentEditingOrder;
+                const requestId = returnRequest._id || returnRequest.id;
+                const action = decision === 'reject' ? 'reject' : 'approve';
                 
-                // Update order status to returned with additional data
-                this.updateOrderStatusWithData('returned', {
-                    returnReason: returnReason,
-                    returnImage: returnImage,
-                    returnDate: new Date().toISOString()
-                });
+                try {
+                    const payload = {
+                        action: action,
+                        staffNotes: returnReason
+                    };
+                    if (decision === 'accept' && returnImage) {
+                        payload.returnImage = returnImage;
+                    }
+                    
+                    const response = await fetch(`http://localhost:3000/api/orders/return-request/${requestId}`, {
+                        method: 'PUT',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(payload)
+                    });
+                    
+                    const result = await response.json().catch(() => ({}));
+                    if (!response.ok) {
+                        throw new Error(result.message || 'Failed to process return request');
+                    }
+                    
+                    const finalStatus = result.status || (decision === 'reject' ? 'rejected' : 'accepted');
+                    const toastMessage = result.message || `Return request ${action === 'approve' ? 'approved' : 'rejected'} successfully`;
+                    showToast(toastMessage, 'success');
+                    
+                    const originalOrder = this.orders.find(o => String(o._id) === String(returnRequest.originalOrderId));
+                    this.sendOrderReturnNotification(originalOrder || returnRequest, returnReason, finalStatus);
+                    
+                    this.currentEditingOrder = null;
+                    
+                    await this.loadReturns();
+                    this.renderReturns();
+                    await this.loadOrders();
+                    this.renderOrders();
+                    await this.loadComprehensiveStats();
+                    this.updateStats();
+                    if (this.currentSection === 'dashboard') {
+                        this.renderDashboard();
+                    }
+                    
+                    const dialog = document.getElementById('orderReturnDialog');
+                    if (dialog) {
+                        dialog.close();
+                    }
+                } catch (error) {
+                    console.error('Error processing return decision:', error);
+                    showToast(error.message || 'Failed to process return request', 'error');
+                }
             }
 
             // Send notification to user when order is returned
-            sendOrderReturnNotification(order, returnReason = '') {
+            sendOrderReturnNotification(order, returnReason = '', decision = 'accepted') {
                 try {
-                    const userId = order.userId;
+                    const isAccepted = decision === 'accepted';
+                    const userId = order.userId || order.customerId || null;
                     if (!userId) {
                         console.warn('No userId found for order, cannot send return notification');
-                        return;
-                    }
+                    } else {
+                        const orderNumber = order.orderNumber || order.originalOrderId || this.generateOrderNumber(order);
+                        const customerName = order.fullName || order.customerName || order.buyerinfo || 'Customer';
                     
-                    const orderNumber = order.orderNumber || this.generateOrderNumber(order);
-                    const customerName = order.fullName || order.buyerinfo || 'Customer';
-                    
-                    // Create notification message
-                    let notificationMessage = `Your order ${orderNumber} has been processed as returned.`;
+                        let notificationMessage;
+                        if (isAccepted) {
+                            notificationMessage = `Your return request for order ${orderNumber} has been approved.`;
                     if (returnReason) {
-                        notificationMessage += ` Return reason: ${returnReason}`;
+                                notificationMessage += ` Staff notes: ${returnReason}`;
                     }
-                    notificationMessage += ' Please contact us if you have any questions about the return process.';
-                    
-                    // Create notification object
+                            notificationMessage += ' We will begin processing the return shortly.';
+                        } else {
+                            notificationMessage = `Your return request for order ${orderNumber} has been rejected.`;
+                            if (returnReason) {
+                                notificationMessage += ` Reason provided: ${returnReason}`;
+                            }
+                            notificationMessage += ' Please contact us if you would like to discuss this decision.';
+                        }
+                        
                     const notification = {
-                        id: `return_${order._id}_${Date.now()}`,
+                            id: `return_${(order._id || order.originalOrderId)}_${Date.now()}`,
                         userId: userId,
-                        title: '↩️ Order Returned',
+                            title: isAccepted ? '↩️ Return Approved' : '🚫 Return Rejected',
                         message: notificationMessage,
                         time: new Date().toISOString(),
                         read: false,
-                        type: 'order_return',
+                            type: isAccepted ? 'order_return_approved' : 'order_return_rejected',
                         orderNumber: orderNumber,
-                        orderId: order._id,
+                            orderId: order._id || order.originalOrderId,
                         returnReason: returnReason || null
                     };
                     
-                    // Store notification in user-specific localStorage
                     const userNotificationKey = `notifications_${userId}`;
                     const existingNotifications = JSON.parse(localStorage.getItem(userNotificationKey) || '[]');
-                    
-                    // Add new notification to the beginning of the array
                     existingNotifications.unshift(notification);
-                    
-                    // Keep only the latest 50 notifications per user
                     if (existingNotifications.length > 50) {
                         existingNotifications.splice(50);
                     }
-                    
-                    // Save back to localStorage
                     localStorage.setItem(userNotificationKey, JSON.stringify(existingNotifications));
                     
-                    console.log(`✅ Return notification sent to user ${userId} for order ${orderNumber}`);
+                        console.log(`✅ Return decision notification sent to user ${userId} for order ${orderNumber}`);
                     
-                    // Also add to staff notifications for tracking
                     this.addNotification({
-                        title: `📤 Return Notice Sent`,
-                        description: `Sent return notification to ${customerName} for order ${orderNumber}${returnReason ? ` (Reason: ${returnReason})` : ''}`,
+                            title: isAccepted ? '📤 Return Approved' : '📤 Return Rejected',
+                            description: `${isAccepted ? 'Approved' : 'Rejected'} return request for ${customerName} (${orderNumber})${returnReason ? ` – ${returnReason}` : ''}`,
                         time: new Date(),
-                        type: 'notification_sent'
-                    });
+                            type: isAccepted ? 'return_approved' : 'return_rejected'
+                        });
+                    }
                     
+                    if (!userId) {
+                        const orderNumber = order.orderNumber || order.originalOrderId || this.generateOrderNumber(order);
+                        const customerName = order.fullName || order.customerName || order.buyerinfo || 'Customer';
+                        this.addNotification({
+                            title: isAccepted ? '📤 Return Approved' : '📤 Return Rejected',
+                            description: `${isAccepted ? 'Approved' : 'Rejected'} return request for ${customerName} (${orderNumber})${returnReason ? ` – ${returnReason}` : ''}`,
+                            time: new Date(),
+                            type: isAccepted ? 'return_approved' : 'return_rejected'
+                    });
+                    }
                 } catch (error) {
                     console.error('Error sending return notification:', error);
                     showToast('Failed to send return notification to customer', 'warning');
@@ -5894,6 +6552,11 @@
                     const files = e.dataTransfer.files;
                     if (files.length > 0 && files[0].type.startsWith('image/')) {
                         this.handleReturnFileSelect(files[0]);
+                        if (dropZone.style.borderColor === 'rgb(220, 53, 69)') {
+                            dropZone.style.borderColor = '';
+                            dropZone.style.backgroundColor = '';
+                        }
+                        this.clearValidationBubble(dropZone);
                     } else {
                         showToast('Please drop a valid image file', 'error');
                     }
@@ -5902,6 +6565,16 @@
 
             // Handle file selection for return image
             handleReturnFileSelect(file) {
+                // Clear error highlighting when image is selected
+                const dropZone = document.getElementById('returnDropZone');
+                if (dropZone && dropZone.style.borderColor === 'rgb(220, 53, 69)') {
+                    dropZone.style.borderColor = '';
+                    dropZone.style.backgroundColor = '';
+                }
+                if (dropZone) {
+                    this.clearValidationBubble(dropZone);
+                }
+                
                 if (!file || !file.type.startsWith('image/')) {
                     showToast('Please select a valid image file', 'error');
                     return;
@@ -5937,12 +6610,19 @@
                 const dropZoneContent = document.querySelector('#returnDropZone .drop-zone-content');
                 const removeBtn = document.getElementById('removeReturnImageBtn');
                 const fileInput = document.getElementById('returnFileInput');
+                const dropZone = document.getElementById('returnDropZone');
 
                 previewImg.src = 'images/sanrico_logo_1.png';
                 imagePreview.classList.add('hidden');
                 dropZoneContent.style.display = 'block';
                 removeBtn.classList.add('hidden');
                 fileInput.value = '';
+                
+                if (dropZone) {
+                    dropZone.style.borderColor = '';
+                    dropZone.style.backgroundColor = '';
+                    this.clearValidationBubble(dropZone);
+                }
             }
 
             // Get return image data
@@ -5954,6 +6634,31 @@
                     return previewImg.src;
                 }
                 return null;
+            }
+
+            showValidationBubble(targetEl, message) {
+                if (!targetEl) return;
+                const container = targetEl.closest('.with-validation') || targetEl;
+                if (!container) return;
+                this.clearValidationBubble(container);
+                container.classList.add('validation-error');
+                
+                const bubble = document.createElement('div');
+                bubble.className = 'validation-bubble';
+                bubble.innerHTML = `<span class="bubble-icon">!</span>${message}`;
+                container.appendChild(bubble);
+            }
+            
+            clearValidationBubble(targetEl) {
+                if (!targetEl) return;
+                const container = targetEl.closest ? targetEl.closest('.with-validation') : targetEl;
+                const normalized = container || targetEl;
+                if (!normalized) return;
+                normalized.classList.remove('validation-error');
+                const existing = normalized.querySelector('.validation-bubble');
+                if (existing) {
+                    existing.remove();
+                }
             }
 
             // Update order status with additional data
@@ -6213,21 +6918,103 @@
                 const selectedItems = returnRequest.selectedItems || returnRequest.itemsordered || [];
                 
                 if (selectedItems.length > 0) {
-                    itemsList.innerHTML = selectedItems.map(item => `
-                        <div class="order-item-modern">
+                    // Render items first
+                    itemsList.innerHTML = selectedItems.map((item, index) => {
+                        // Try multiple possible image field names
+                        const itemImage = item.image || item.item_image || item.itemImage || null;
+                        const imageUrl = itemImage ? this.getImageUrl(itemImage) : null;
+                        const itemId = item.item_id || item.id || null;
+                        
+                        return `
+                        <div class="order-item-modern" data-item-index="${index}" data-item-id="${itemId || ''}">
                             <div class="item-image">
-                                ${item.image ? `<img src="${item.image}" alt="${item.name || 'Item'}" onerror="this.style.display='none'">` : '<div class="no-image">No Image</div>'}
+                                ${imageUrl ? `<img src="${imageUrl}" alt="${item.name || item.item_name || 'Item'}" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';"><div class="no-image" style="display:none;">No Image</div>` : '<div class="no-image">No Image</div>'}
                             </div>
                             <div class="item-details">
-                                <h4 class="item-name">${item.name || item.productName || 'Unknown Item'}</h4>
-                                <p class="item-sku">SKU: ${item.sku || item.id || 'N/A'}</p>
+                                <h4 class="item-name">${item.name || item.item_name || item.productName || 'Unknown Item'}</h4>
+                                <p class="item-sku">SKU: ${item.sku || item.id || item.item_id || 'N/A'}</p>
                                 <div class="item-meta">
-                                    <span class="item-quantity">Quantity: ${item.quantity || 1}</span>
-                                    <span class="item-price">₱${(item.price || 0).toFixed(2)}</span>
+                                    <span class="item-quantity">Quantity: ${item.quantity || item.amount_per_item || 1}</span>
+                                    <span class="item-price">₱${(item.price || item.price_per_item || 0).toFixed(2)}</span>
                                 </div>
                             </div>
                         </div>
-                    `).join('');
+                    `;
+                    }).join('');
+                    
+                    // Try to fetch missing images from products or original order
+                    selectedItems.forEach(async (item, index) => {
+                        const itemImage = item.image || item.item_image || item.itemImage;
+                        const itemId = item.item_id || item.id;
+                        
+                        if (!itemImage && itemId) {
+                            try {
+                                // Normalize IDs to strings for comparison
+                                const itemIdStr = String(itemId);
+                                
+                                // First try to find in loaded products
+                                let product = this.products.find(p => String(p.id) === itemIdStr);
+                                
+                                // If not found, try to fetch from API
+                                if (!product) {
+                                    try {
+                                        const response = await fetch(`http://localhost:3000/api/products/${itemIdStr}`);
+                                        if (response.ok) {
+                                            const productData = await response.json();
+                                            product = {
+                                                id: productData._id,
+                                                image: productData.image
+                                            };
+                                        }
+                                    } catch (apiError) {
+                                        console.error('Error fetching product from API:', apiError);
+                                    }
+                                }
+                                
+                                // If still no product image, try to get from original order
+                                let finalImage = product?.image;
+                                if (!finalImage && returnRequest.originalOrderId) {
+                                    try {
+                                        // Try to find the order in loaded orders
+                                        const originalOrder = this.orders.find(o => String(o._id) === String(returnRequest.originalOrderId));
+                                        if (originalOrder && originalOrder.itemsordered) {
+                                            const orderItem = originalOrder.itemsordered.find(oi => 
+                                                String(oi.item_id) === itemIdStr || 
+                                                String(oi.item_id) === String(item.item_id)
+                                            );
+                                            if (orderItem && orderItem.item_image) {
+                                                finalImage = orderItem.item_image;
+                                            }
+                                        }
+                                    } catch (orderError) {
+                                        console.error('Error fetching image from original order:', orderError);
+                                    }
+                                }
+                                
+                                if (finalImage) {
+                                    const itemElement = itemsList.querySelector(`[data-item-index="${index}"] .item-image`);
+                                    if (itemElement) {
+                                        const noImageDiv = itemElement.querySelector('.no-image');
+                                        if (noImageDiv) {
+                                            const img = document.createElement('img');
+                                            img.src = this.getImageUrl(finalImage);
+                                            img.alt = item.name || item.item_name || 'Item';
+                                            img.style.maxWidth = '100%';
+                                            img.style.height = 'auto';
+                                            img.onerror = () => {
+                                                img.style.display = 'none';
+                                                if (noImageDiv) noImageDiv.style.display = 'block';
+                                            };
+                                            itemElement.insertBefore(img, noImageDiv);
+                                            noImageDiv.style.display = 'none';
+                                        }
+                                    }
+                                }
+                            } catch (error) {
+                                console.error('Error fetching product image for return item:', error);
+                            }
+                        }
+                    });
                 } else {
                     itemsList.innerHTML = '<p class="no-items">No items specified for return</p>';
                 }
@@ -6238,7 +7025,7 @@
                 if (returnRequest.returnImage) {
                     returnImageSection.style.display = 'block';
                     returnImageContainer.innerHTML = `
-                        <img src="${returnRequest.returnImage}" alt="Return documentation" class="return-doc-image" onerror="this.style.display='none'">
+                        <img src="${this.getImageUrl(returnRequest.returnImage)}" alt="Return documentation" class="return-doc-image" onerror="this.style.display='none'">
                     `;
                 } else {
                     returnImageSection.style.display = 'none';
@@ -6365,5 +7152,8 @@
             initializeStaffDashboard();
         });
     </script>
+</body>
+</html>
+
 </body>
 </html>

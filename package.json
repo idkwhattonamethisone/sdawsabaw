@@ -15,6 +15,11 @@
     "view-users": "node view-users.js",
     "test-login": "node test-login.js",
     "setup-db": "npx @better-auth/cli migrate",
+    "create-indexes": "node create-indexes.js",
+    "remove-duplicates": "node remove-duplicate-products.js",
+    "check-db": "node check-database-performance.js",
+    "extract-images": "node extract-base64-images.js",
+    "update-images": "node update-image-urls.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "dependencies": {

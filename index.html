@@ -1197,13 +1197,15 @@
         // This ensures products API call begins as soon as script loads
         // For index page, we only need limited products for featured section and category carousel
         // Featured: 5 products, Categories: ~7 categories × 4 products = 28 products
-        // Fetch ~60 products to ensure enough after stock filtering
-        const INDEX_PRODUCTS_LIMIT = 60;
+        // Fetch 45 products (optimized from 60) - enough buffer after stock filtering
+        // Use skipSort=true to skip expensive sorting for faster loading
+        const INDEX_PRODUCTS_LIMIT = 45;
         
         // Create a separate limited promise for index page display
         // headerSearch.js will still use window.productsPromise for full search functionality
-        // Use limit parameter in API call to reduce network transfer
-        const indexProductsPromise = fetch(`http://localhost:3000/api/products?limit=${INDEX_PRODUCTS_LIMIT}`).then(response => {
+        // Use skipSort=true to skip sorting for much faster loading (we'll sort client-side if needed)
+        // Use minimal=true to only fetch essential fields (dramatically reduces data size)
+        const indexProductsPromise = fetch(`http://localhost:3000/api/products?limit=${INDEX_PRODUCTS_LIMIT}&skipSort=true&minimal=true`).then(response => {
             if (!response.ok) throw new Error('Failed to fetch products');
             return response.json();
         }).catch(error => {
@@ -1249,56 +1251,58 @@
                 // Wait for limited products (already started above)
                 let products = await indexProductsPromise;
                 
-                // Get unique categories from database
-                const uniqueCategories = [...new Set(products.map(p => p.category))];
-                
-                // Convert price to number - prefer SellingPrice, but fall back gracefully
+                // Optimized: Process products in a single pass for better performance
+                // Convert price and filter stock in one map operation
                 const toNumber = (val) => {
                     if (val === null || val === undefined) return NaN;
                     if (typeof val === 'object' && val.$numberDecimal !== undefined) return parseFloat(val.$numberDecimal);
                     return parseFloat(val);
                 };
-                products = products.map(product => {
-                    const candidates = [product.SellingPrice, product.sellingPrice, product.Price, product.price];
-                    let finalPrice = NaN;
-                    for (const c of candidates) {
-                        const n = toNumber(c);
-                        if (!isNaN(n)) { finalPrice = n; break; }
-                    }
-                    const convertedProduct = { ...product, price: finalPrice };
-                    console.log('Converted product:', convertedProduct);
-                    return convertedProduct;
-                });
                 
-                console.log('Products after price conversion:', products);
+                // Single pass: convert price and filter stock simultaneously
+                products = products
+                    .map(product => {
+                        // Fast price extraction - check most common fields first
+                        const price = toNumber(product.SellingPrice) || 
+                                     toNumber(product.sellingPrice) || 
+                                     toNumber(product.Price) || 
+                                     toNumber(product.price) || 
+                                     NaN;
+                        return { ...product, price };
+                    })
+                    .filter(product => product.stockQuantity > 0 && !isNaN(product.price));
 
-                // Filter out products with 0 stock
-                products = products.filter(product => product.stockQuantity > 0);
-                console.log('Products after stock filtering:', products);
-
-                // Group products by normalized category buckets
+                // Optimized category normalization - use Map for faster lookups
+                const categoryMap = new Map([
+                    ['power-tools', 'tools-accessories'],
+                    ['hand-tools', 'tools-accessories'],
+                    ['building-materials', 'building-materials-aggregates'],
+                    ['plumbing', 'plumbing-fixtures'],
+                    ['electrical', 'electrical-supplies']
+                ]);
+                
                 const normalizeCategory = (raw) => {
-                    const val = String(raw || '').toLowerCase();
-                    const includesAny = (list) => list.some(k => val.includes(k));
-                    if (includesAny(['paint','painting'])) return 'paints';
-                    if (includesAny(['power-tools','powertools','hand-tools','handtools','tool','tools','accessor'])) return 'tools-accessories';
-                    if (includesAny(['building-materials','aggregate','cement','sand','gravel','hollow','plywood','wood','lumber','tile','roof'])) return 'building-materials-aggregates';
-                    if (includesAny(['electrical','wire','breaker','outlet','switch'])) return 'electrical-supplies';
-                    if (includesAny(['plumbing','fixture','pipe','fitting','faucet','valve'])) return 'plumbing-fixtures';
-                    if (includesAny(['fastener','screw','nail','bolt','nut','consumable','adhesive','sealant','tape'])) return 'fasteners-consumables';
-                    switch (String(raw || '')) {
-                        case 'Power-Tools':
-                        case 'Hand-Tools':
-                            return 'tools-accessories';
-                        case 'Building-Materials':
-                            return 'building-materials-aggregates';
-                        case 'Plumbing':
-                            return 'plumbing-fixtures';
-                        case 'Electrical':
-                            return 'electrical-supplies';
-                        default:
-                            return 'other';
-                    }
+                    if (!raw) return 'other';
+                    const val = String(raw).toLowerCase();
+                    
+                    // Check exact matches first (fastest)
+                    if (categoryMap.has(val)) return categoryMap.get(val);
+                    
+                    // Then check includes (slower, but needed for variations)
+                    if (val.includes('paint')) return 'paints';
+                    if (val.includes('tool') || val.includes('accessor')) return 'tools-accessories';
+                    if (val.includes('building') || val.includes('aggregate') || val.includes('cement') || 
+                        val.includes('sand') || val.includes('gravel') || val.includes('wood') || 
+                        val.includes('lumber') || val.includes('tile') || val.includes('roof')) return 'building-materials-aggregates';
+                    if (val.includes('electrical') || val.includes('wire') || val.includes('breaker') || 
+                        val.includes('outlet') || val.includes('switch')) return 'electrical-supplies';
+                    if (val.includes('plumbing') || val.includes('fixture') || val.includes('pipe') || 
+                        val.includes('fitting') || val.includes('faucet') || val.includes('valve')) return 'plumbing-fixtures';
+                    if (val.includes('fastener') || val.includes('screw') || val.includes('nail') || 
+                        val.includes('bolt') || val.includes('nut') || val.includes('adhesive') || 
+                        val.includes('sealant') || val.includes('tape')) return 'fasteners-consumables';
+                    
+                    return 'other';
                 };
 
                 const desiredOrder = [
@@ -1311,12 +1315,15 @@
                     'other'
                 ];
 
+                // Optimized: Group products by category in single pass
                 const productsByCategory = {};
-                products.forEach(product => {
+                for (const product of products) {
                     const bucket = normalizeCategory(product.category);
-                    if (!productsByCategory[bucket]) productsByCategory[bucket] = [];
+                    if (!productsByCategory[bucket]) {
+                        productsByCategory[bucket] = [];
+                    }
                     productsByCategory[bucket].push(product);
-                });
+                }
 
                 // Hide loading skeletons
                 if (categorySkeleton) categorySkeleton.classList.add('hidden');
@@ -1406,7 +1413,12 @@
                 }
 
                 // Update featured products - show 5 random products
-                const shuffled = products.slice().sort(() => Math.random() - 0.5);
+                // Optimized: Use Fisher-Yates shuffle for better performance
+                const shuffled = [...products];
+                for (let i = shuffled.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+                }
                 const featuredProducts = shuffled.slice(0, Math.min(5, shuffled.length));
 
                 const featuredGrid = document.querySelector('.featured .product-grid');

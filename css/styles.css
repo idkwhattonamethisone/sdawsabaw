@@ -260,7 +260,7 @@ header .container:first-child {
     padding: 12px 24px;
     border-radius: 8px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-    z-index: 9999; /* Higher z-index to ensure it's on top */
+    z-index: 99999 !important; /* Very high z-index to ensure it's above all modals and dialogs */
     opacity: 0;
     transition: opacity 0.3s ease;
     pointer-events: none;
