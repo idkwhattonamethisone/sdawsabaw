@@ -2302,6 +2302,7 @@
 
             normalizeOrderItems(items = []) {
                 return items.map(item => ({
+                    item_id: item.item_id || item.id || '',
                     item_name: item.item_name || item.name || 'Unnamed Item',
                     amount_per_item: item.amount_per_item || item.quantity || 0,
                     per_item_price: parseFloat(item.per_item_price || item.price_per_item || item.item_price || item.price || 0),
