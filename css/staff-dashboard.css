@@ -450,7 +450,7 @@ html, body {
 .main-content {
   flex: 1;
   padding: 2rem;
-  overflow-y: auto;
+  overflow-y: visible;
   box-sizing: border-box;
 }
 
@@ -1044,14 +1044,16 @@ select.form-control:focus {
 .products-table-container {
   background: var(--card-bg);
   border-radius: 0 0 var(--border-radius) var(--border-radius);
-  padding: 0 1.5rem 1.5rem 1.5rem;
+  padding: 0 1.5rem 3rem 1.5rem;
   padding-top: 0 !important;
   box-shadow: 0 4px 12px var(--shadow);
   border: 1px solid var(--input-border);
   border-top: none;
-  overflow-x: auto;
-  margin-bottom: 2rem;
+  overflow: visible;
+  margin-bottom: 0.5rem;
   margin-top: 0 !important;
+  max-height: none;
+  height: auto;
 }
 
 .products-table {
@@ -1059,26 +1061,156 @@ select.form-control:focus {
   border-collapse: collapse;
   background: var(--card-bg);
   min-width: 800px;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
 }
 
 .products-table th,
 .products-table td {
-  padding: 1rem;
+  padding: 1.5rem 1.25rem;
   text-align: left;
-  border-bottom: 1px solid var(--input-border);
+  border-bottom: 1px solid #e5e7eb;
   vertical-align: middle;
+  font-weight: 500;
 }
 
 .products-table th {
-  background: var(--input-bg);
-  font-weight: 600;
-  color: var(--text);
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+  font-weight: 700;
+  color: #374151;
   position: sticky;
   top: 0;
+  font-size: 0.875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  z-index: 10;
+}
+
+.products-table tr:nth-child(even) {
+  background: #f9fafb;
+}
+
+.products-table tr:nth-child(odd) {
+  background: #ffffff;
 }
 
 .products-table tr:hover {
-  background: var(--input-bg);
+  background: linear-gradient(135deg, #fef3f2 0%, #fee2e2 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(230, 57, 70, 0.1);
+  transition: all 0.2s ease;
+}
+
+.products-table tr {
+  transition: all 0.2s ease;
+  height: 65px !important; /* Fixed row height */
+  min-height: 65px !important;
+  max-height: 65px !important;
+  overflow: hidden; /* Prevent content overflow */
+}
+
+/* Ensure consistent row height across all rows */
+.products-table tr {
+  transition: all 0.2s ease;
+  height: 65px; /* Increased height for better consistency */
+  min-height: 65px; /* Ensure minimum height */
+  max-height: 65px; /* Prevent rows from expanding */
+}
+
+/* Ensure table cells maintain consistent alignment */
+.products-table td {
+  vertical-align: middle; /* Center content vertically */
+  padding: 1rem; /* Consistent padding */
+}
+
+/* Apply same visual enhancements to all dashboard tables */
+.dashboard-table,
+.inventory-table,
+.sales-table,
+.reports-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--card-bg);
+  min-width: 600px;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+}
+
+.dashboard-table th,
+.dashboard-table td,
+.inventory-table th,
+.inventory-table td,
+.sales-table th,
+.sales-table td,
+.reports-table th,
+.reports-table td {
+  padding: 1.5rem 1.25rem;
+  text-align: left;
+  border-bottom: 1px solid #e5e7eb;
+  vertical-align: middle;
+  font-weight: 500;
+}
+
+.dashboard-table th,
+.inventory-table th,
+.sales-table th,
+.reports-table th {
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+  font-weight: 700;
+  color: #374151;
+  position: sticky;
+  top: 0;
+  font-size: 0.875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  z-index: 10;
+}
+
+.dashboard-table tr:nth-child(even),
+.inventory-table tr:nth-child(even),
+.sales-table tr:nth-child(even),
+.reports-table tr:nth-child(even) {
+  background: #f9fafb;
+}
+
+.dashboard-table tr:nth-child(odd),
+.inventory-table tr:nth-child(odd),
+.sales-table tr:nth-child(odd),
+.reports-table tr:nth-child(odd) {
+  background: #ffffff;
+}
+
+.dashboard-table tr:hover,
+.inventory-table tr:hover,
+.sales-table tr:hover,
+.reports-table tr:hover {
+  background: linear-gradient(135deg, #fef3f2 0%, #fee2e2 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(230, 57, 70, 0.1);
+  transition: all 0.2s ease;
+}
+
+.dashboard-table tr,
+.inventory-table tr,
+.sales-table tr,
+.reports-table tr {
+  transition: all 0.2s ease;
+  height: 65px !important;
+  min-height: 65px !important;
+  max-height: 65px !important;
+  overflow: hidden;
+}
+
+.dashboard-table td,
+.inventory-table td,
+.sales-table td,
+.reports-table td {
+  vertical-align: middle;
+  padding: 1rem;
 }
 
 .product-image-cell {
@@ -1189,14 +1321,16 @@ select.form-control:focus {
 .walkin-orders-table-container {
   background: var(--card-bg);
   border-radius: 0 0 var(--border-radius) var(--border-radius);
-  padding: 0 1.5rem 1.5rem 1.5rem;
+  padding: 0 1.5rem 4rem 1.5rem;
   padding-top: 0 !important;
   box-shadow: 0 4px 12px var(--shadow);
   border: 1px solid var(--input-border);
   border-top: none;
   margin-top: 0 !important;
-  overflow-x: auto;
-  margin-bottom: 2rem;
+  overflow: visible;
+  margin-bottom: 0.25rem;
+  max-height: none;
+  height: auto;
 }
 
 /* Ensure tab content is visible when displayed */
@@ -1252,33 +1386,115 @@ select.form-control:focus {
   border-collapse: collapse;
   background: var(--card-bg);
   min-width: 800px;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
 }
 
 .orders-table th,
 .orders-table td {
-  padding: 1rem;
+  padding: 1.5rem 1.25rem;
   text-align: left;
-  border-bottom: 1px solid var(--input-border);
+  border-bottom: 1px solid #e5e7eb;
+  vertical-align: middle;
+  font-weight: 500;
 }
 
 .orders-table th {
-  background: var(--input-bg);
-  font-weight: 600;
-  color: var(--text);
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+  font-weight: 700;
+  color: #374151;
   position: sticky;
   top: 0;
+  font-size: 0.875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  z-index: 10;
+}
+
+.orders-table tr:nth-child(even) {
+  background: #f9fafb;
+}
+
+.orders-table tr:nth-child(odd) {
+  background: #ffffff;
 }
 
 .orders-table tr:hover {
-  background: var(--input-bg);
+  background: linear-gradient(135deg, #fef3f2 0%, #fee2e2 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(230, 57, 70, 0.1);
+  transition: all 0.2s ease;
+}
+
+.orders-table tr {
+  transition: all 0.2s ease;
+  height: 65px !important; /* Fixed row height */
+  min-height: 65px !important;
+  max-height: 65px !important;
+  overflow: hidden; /* Prevent content overflow */
+}
+
+/* Order ID column specific styling - wider to prevent wrapping */
+.orders-table th:first-child,
+.orders-table td:first-child {
+  width: 18% !important; /* Make Order ID column appropriately wider */
+  min-width: 160px; /* Minimum width to prevent wrapping */
+  white-space: nowrap; /* Prevent text wrapping */
+  overflow: hidden;
+  text-overflow: ellipsis; /* Show ellipsis if still too long */
+  font-weight: 700 !important; /* Make Order ID bold */
+}
+
+/* Make all other columns equal width */
+.orders-table th:not(:first-child),
+.orders-table td:not(:first-child) {
+  width: calc((100% - 18%) / 8); /* Distribute remaining width equally among 8 columns */
+  min-width: 90px;
+}
+
+/* Ensure consistent row height across all rows */
+.orders-table tr {
+  transition: all 0.2s ease;
+  height: 65px; /* Increased height for better consistency */
+  min-height: 65px; /* Ensure minimum height */
+  max-height: 65px; /* Prevent rows from expanding */
+}
+
+/* Ensure table cells maintain consistent alignment */
+.orders-table td {
+  vertical-align: middle; /* Center content vertically */
+  padding: 1rem; /* Consistent padding */
+}
+
+/* Status column specific styling for better alignment */
+.orders-table td:nth-child(8) {
+  text-align: center; /* Center status badges */
+}
+
+/* Actions column specific styling */
+.orders-table td:nth-child(9) {
+  text-align: center; /* Center action buttons */
 }
 
 .status-badge {
-  padding: 0.25rem 0.75rem;
-  border-radius: 20px;
+  padding: 0.375rem 0.875rem;
+  border-radius: 16px;
   font-size: 0.8rem;
   font-weight: 600;
   text-transform: uppercase;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+}
+
+.status-badge:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
 }
 
 .status-badge.pending {
@@ -1312,6 +1528,9 @@ select.form-control:focus {
   font-size: 0.8rem;
   font-weight: 600;
   text-transform: uppercase;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
 }
 
 .payment-method.cash {
@@ -2451,14 +2670,16 @@ select.form-control:focus {
 .returns-table-container {
     background: var(--card-bg);
     border-radius: 0 0 var(--border-radius) var(--border-radius);
-    padding: 0 1.5rem 1.5rem 1.5rem;
+    padding: 0 1.5rem 3rem 1.5rem;
     padding-top: 0 !important;
     box-shadow: 0 4px 12px var(--shadow);
     border: 1px solid var(--input-border);
     border-top: none;
-    overflow-x: auto;
-    margin-bottom: 2rem;
+    overflow: visible;
+    margin-bottom: 0.5rem;
     margin-top: 0 !important;
+    max-height: none;
+    height: auto;
 }
 
 .returns-table {
@@ -2466,25 +2687,86 @@ select.form-control:focus {
     border-collapse: collapse;
     background: var(--card-bg);
     min-width: 800px;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
 }
 
 .returns-table th,
 .returns-table td {
-    padding: 1rem;
+    padding: 1.5rem 1.25rem;
     text-align: left;
-    border-bottom: 1px solid var(--input-border);
+    border-bottom: 1px solid #e5e7eb;
+    vertical-align: middle;
+    font-weight: 500;
 }
 
 .returns-table th {
-    background: var(--input-bg);
-    font-weight: 600;
-    color: var(--text);
+    background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+    font-weight: 700;
+    color: #374151;
     position: sticky;
     top: 0;
+    font-size: 0.875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    z-index: 10;
+}
+
+.returns-table tr:nth-child(even) {
+    background: #f9fafb;
+}
+
+.returns-table tr:nth-child(odd) {
+    background: #ffffff;
 }
 
 .returns-table tr:hover {
-    background: var(--input-bg);
+    background: linear-gradient(135deg, #fef3f2 0%, #fee2e2 100%);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(230, 57, 70, 0.1);
+    transition: all 0.2s ease;
+}
+
+.returns-table tr {
+    transition: all 0.2s ease;
+    height: 65px !important; /* Fixed row height */
+    min-height: 65px !important;
+    max-height: 65px !important;
+    overflow: hidden; /* Prevent content overflow */
+}
+
+/* Ensure consistent row height across all rows */
+.returns-table tr {
+    transition: all 0.2s ease;
+    height: 65px; /* Increased height for better consistency */
+    min-height: 65px; /* Ensure minimum height */
+    max-height: 65px; /* Prevent rows from expanding */
+}
+
+/* Order ID column specific styling for returns table */
+.returns-table th:first-child,
+.returns-table td:first-child {
+  width: 18% !important; /* Make Order ID column appropriately wider */
+  min-width: 160px; /* Minimum width to prevent wrapping */
+  white-space: nowrap; /* Prevent text wrapping */
+  overflow: hidden;
+  text-overflow: ellipsis; /* Show ellipsis if still too long */
+  font-weight: 700 !important; /* Make Order ID bold */
+}
+
+/* Make all other columns equal width */
+.returns-table th:not(:first-child),
+.returns-table td:not(:first-child) {
+  width: calc((100% - 18%) / 8); /* Distribute remaining width equally among 8 columns */
+  min-width: 90px;
+}
+
+/* Ensure table cells maintain consistent alignment */
+.returns-table td {
+    vertical-align: middle; /* Center content vertically */
+    padding: 1rem; /* Consistent padding */
 }
 
 .return-status-badge {

@@ -4444,7 +4444,7 @@
                                 ${isReturned ? 'RETURNED' : new Date(order.orderDate || order.createdAt || order.original_date).toLocaleDateString('en-US', {
                                     month: 'short',
                                     day: 'numeric',
-                                    year: '2-digit',
+                                    year: 'numeric',
                                     hour: '2-digit',
                                     minute: '2-digit'
                                 })}
