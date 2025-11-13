@@ -280,15 +280,28 @@ document.addEventListener('DOMContentLoaded', () => {
             `;
             return;
         }
-        let itemsHtml = items.map(item => `
-            <div class="cart-item">
-                <img src="${item.image ? (item.image.startsWith('data:image') ? item.image : 'images/' + item.image) : 'images/sanrico_logo_1.png'}" onerror="this.src='images/sanrico_logo_1.png'" alt="${item.name}">
-                <div class="cart-item-details">
-                    <div class="cart-item-title">${item.name}</div>
-                    <div class="cart-item-price">${formatPHPPrice(item.price)} | Qty: ${item.quantity}</div>
+        let itemsHtml = items.map(item => {
+            let imageSrc = item.image || 'sanrico_logo_1.png';
+            if (
+                imageSrc &&
+                !imageSrc.startsWith('http') &&
+                !imageSrc.startsWith('data:') &&
+                !imageSrc.startsWith('/')
+            ) {
+                imageSrc = imageSrc.replace(/^images\//, ''); // remove leading images/ to avoid double
+                imageSrc = 'images/' + imageSrc;
+                imageSrc = '/' + imageSrc;
+            }
+            return `
+                <div class="cart-item">
+                    <img src="${imageSrc}" onerror="this.src='/images/sanrico_logo_1.png'" alt="${item.name}">
+                    <div class="cart-item-details">
+                        <div class="cart-item-title">${item.name}</div>
+                        <div class="cart-item-price">${formatPHPPrice(item.price)} | Qty: ${item.quantity}</div>
+                    </div>
                 </div>
-            </div>
-        `).join('');
+            `;
+        }).join('');
         const subtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
         cartDropdownContent.innerHTML = `
             <div style="font-weight: bold; margin-bottom: 10px;">My Cart, <span style="color: #e63946;">${items.length}</span> item${items.length > 1 ? 's' : ''}</div>

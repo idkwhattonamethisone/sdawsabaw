@@ -51,9 +51,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                 imageSrc &&
                 !imageSrc.startsWith('http') &&
                 !imageSrc.startsWith('data:') &&
-                !imageSrc.startsWith('images/')
+                !imageSrc.startsWith('/')
             ) {
+                imageSrc = imageSrc.replace(/^images\//, ''); // remove leading images/ to avoid double
                 imageSrc = 'images/' + imageSrc;
+                imageSrc = '/' + imageSrc;
             }
             const checked = selectedCartItemIds.size === 0 || selectedCartItemIds.has(item.id) ? 'checked' : '';
             return `
