@@ -19,7 +19,7 @@ app.use(express.json());
 // Configuration
 const config = {
     MONGODB_URI: process.env.MONGODB_URI || 'mongodb://localhost:27017/sanrico-mercantile',
-    DATABASE_NAME: process.env.DATABASE_NAME || 'sanrico-mercantile',
+    DATABASE_NAME: process.env.DATABASE_NAME || 'MyProductsDb',
     JWT_SECRET: process.env.JWT_SECRET || 'your_super_secure_jwt_secret_key_here',
     SENDER_EMAIL: process.env.SENDER_EMAIL || 'sanricomercantileofficial@gmail.com',
     N8N_WEBHOOK_URL: process.env.N8N_WEBHOOK_URL || 'http://localhost:5678/webhook/send-verification-email'

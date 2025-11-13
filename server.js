@@ -11,6 +11,13 @@ require('dotenv').config();
 const app = express();
 const port = process.env.PORT || 3000;
 
+if (!process.env.MONGODB_URI) {
+    console.error("❌ Missing required environment variable: MONGODB_URI");
+    process.exit(1);
+}
+
+const databaseName = process.env.DATABASE_NAME || 'MyProductsDb';
+
 // Security middleware
 app.use(securityMiddleware.setSecurityHeaders);
 app.use(securityMiddleware.rateLimit);
@@ -35,7 +42,7 @@ async function connectToDatabase() {
         if (!client.topology || !client.topology.isConnected()) {
             await client.connect();
         }
-        return client.db("MyProductsDb");
+        return client.db(databaseName);
     } catch (error) {
         console.error("❌ Database connection error:", error);
         throw error;
@@ -43,8 +50,7 @@ async function connectToDatabase() {
 }
 
 // MongoDB connection string
-const uri = "mongodb+srv://24uglyandrew:weaklings162@sanricofree.tesbmqx.mongodb.net/";
-const client = new MongoClient(uri);
+const client = new MongoClient(process.env.MONGODB_URI);
 
 // Connect to MongoDB
 async function connectToMongo() {
@@ -55,7 +61,7 @@ async function connectToMongo() {
         await client.db("admin").command({ ping: 1 });
         
         // Test access to our database
-        const database = client.db("MyProductsDb");
+        const database = client.db(databaseName);
         
         // Test all three order collections
         const pendingCollection = database.collection("PendingOrders");
@@ -76,7 +82,7 @@ async function connectToMongo() {
 // API endpoint to get all products (with optional limit, pagination, and category filter)
 app.get('/api/products', async (req, res) => {
     try {
-        const database = client.db("MyProductsDb");
+        const database = client.db(databaseName);
         const collection = database.collection("Products");
         
         // Build query filter
@@ -284,7 +290,7 @@ app.get('/api/products', async (req, res) => {
 app.get('/api/products/:id', async (req, res) => {
     try {
         const { ObjectId } = require('mongodb');
-        const database = client.db("MyProductsDb");
+        const database = client.db(databaseName);
         const collection = database.collection("Products");
         const product = await collection.findOne({ 
             _id: new ObjectId(req.params.id), 
@@ -321,7 +327,7 @@ app.put('/api/products/bulk-stock', async (req, res) => {
         }
         
         
-        const database = client.db("MyProductsDb");
+        const database = client.db(databaseName);
         const collection = database.collection("Products");
         
         // Process each update
@@ -374,7 +380,7 @@ app.put('/api/products/:id', async (req, res) => {
         const { ObjectId } = require('mongodb');
         const updateData = req.body;
         
-        const database = client.db("MyProductsDb");
+        const database = client.db(databaseName);
         const collection = database.collection("Products");
         
         const result = await collection.updateOne(
@@ -403,7 +409,7 @@ app.put('/api/products/:id/stock', async (req, res) => {
             return res.status(400).json({ error: "Invalid quantity" });
         }
         
-        const database = client.db("MyProductsDb");
+        const database = client.db(databaseName);
         const collection = database.collection("Products");
         
         const result = await collection.updateOne(
@@ -433,7 +439,7 @@ app.post('/api/products/validate-stock', async (req, res) => {
             return res.status(400).json({ error: "Items array is required" });
         }
         
-        const database = client.db("MyProductsDb");
+        const database = client.db(databaseName);
         const collection = database.collection("Products");
         
         const validationResults = [];
@@ -496,7 +502,7 @@ app.post('/api/products/reserve-stock', async (req, res) => {
             return res.status(400).json({ error: "Items array and reservationId are required" });
         }
         
-        const database = client.db("MyProductsDb");
+        const database = client.db(databaseName);
         const collection = database.collection("Products");
         const reservationsCollection = database.collection("StockReservations");
         
@@ -538,7 +544,7 @@ app.post('/api/products/restore-stock', async (req, res) => {
             return res.status(400).json({ error: "Items array is required" });
         }
         
-        const database = client.db("MyProductsDb");
+        const database = client.db(databaseName);
         const collection = database.collection("Products");
         
         const results = [];
@@ -593,7 +599,7 @@ app.post('/api/products/stock-levels', async (req, res) => {
             return res.status(400).json({ error: "Product IDs array is required" });
         }
         
-        const database = client.db("MyProductsDb");
+        const database = client.db(databaseName);
         const collection = database.collection("Products");
         
         const objectIds = productIds.map(id => new ObjectId(id));
@@ -649,7 +655,7 @@ app.post('/api/orders', async (req, res) => {
             return res.status(400).json({ error: "Missing or invalid cartItems" });
         }
         
-        const database = client.db("MyProductsDb");
+        const database = client.db(databaseName);
         const collection = database.collection("PendingOrders");
         
         // Normalize category bucket for each cart item
@@ -754,7 +760,7 @@ app.get('/api/orders/pending', async (req, res) => {
     try {
         await client.db("admin").command({ ping: 1 });
         
-        const database = client.db("MyProductsDb");
+        const database = client.db(databaseName);
         const collection = database.collection("PendingOrders");
         
         const totalCount = await collection.countDocuments({});
@@ -803,7 +809,7 @@ app.get('/api/orders/pending', async (req, res) => {
 app.get('/api/orders/stats/staff-overview', async (req, res) => {
     try {
         
-        const database = client.db("MyProductsDb");
+        const database = client.db(databaseName);
         
         // Get counts from all collections
         const pendingCollection = database.collection("PendingOrders");
@@ -880,7 +886,7 @@ app.get('/api/orders/stats/:userId', async (req, res) => {
         // Create query with $or to match any condition, or use single condition if only one
         const userQuery = queryConditions.length > 1 ? { $or: queryConditions } : (queryConditions.length === 1 ? queryConditions[0] : {});
         
-        const database = client.db("MyProductsDb");
+        const database = client.db(databaseName);
         
         // Count orders in each collection
         const pendingCount = await database.collection("PendingOrders").countDocuments(userQuery);
@@ -957,7 +963,7 @@ app.get('/api/orders/all-staff', async (req, res) => {
         const minimal = req.query.minimal === 'true';
         const limit = req.query.limit ? parseInt(req.query.limit, 10) : null;
         
-        const database = client.db("MyProductsDb");
+        const database = client.db(databaseName);
         const pendingCollection = database.collection("PendingOrders");
         const acceptedCollection = database.collection("AcceptedOrders");
         const deliveredCollection = database.collection("DeliveredOrders");
@@ -1115,7 +1121,7 @@ app.get('/api/orders/all-staff', async (req, res) => {
 app.get('/api/orders/details/:orderId', async (req, res) => {
     try {
         const { orderId } = req.params;
-        const database = client.db("MyProductsDb");
+        const database = client.db(databaseName);
         
         const collections = [
             { name: 'pending', displayStatus: 'pending', collection: database.collection("PendingOrders") },
@@ -1159,7 +1165,7 @@ app.get('/api/orders/details/:orderId', async (req, res) => {
 // API endpoint to get return requests for staff review
 app.get('/api/orders/return-requests', async (req, res) => {
     try {
-        const database = client.db("MyProductsDb");
+        const database = client.db(databaseName);
         const returnRequestsCollection = database.collection("ReturnRequests");
 
         const returnRequests = await returnRequestsCollection.aggregate([
@@ -1203,7 +1209,7 @@ app.get('/api/orders/:userId', async (req, res) => {
         const userIdAsString = String(userId);
         const userIdAsNumber = isNaN(userId) ? null : Number(userId);
         
-        const database = client.db("MyProductsDb");
+        const database = client.db(databaseName);
         
         // Fetch from all order collections
         const pendingCollection = database.collection("PendingOrders");
@@ -1452,7 +1458,7 @@ app.put('/api/orders/:orderId/payment', async (req, res) => {
         const { ObjectId } = require('mongodb');
         const { paymentUpdates } = req.body;
         
-        const database = client.db("MyProductsDb");
+        const database = client.db(databaseName);
         const collection = database.collection("PendingOrders");
         
         const result = await collection.updateOne(
@@ -1474,7 +1480,7 @@ app.put('/api/orders/:orderId/payment', async (req, res) => {
 // API endpoint to get all orders (for debugging)
 app.get('/api/orders', async (req, res) => {
     try {
-        const database = client.db("MyProductsDb");
+        const database = client.db(databaseName);
         const collection = database.collection("PendingOrders");
         
         const allOrders = await collection.aggregate([
@@ -1502,7 +1508,7 @@ app.put('/api/orders/:orderId/status', async (req, res) => {
             return res.status(400).json({ error: "Status is required" });
         }
         
-        const database = client.db("MyProductsDb");
+        const database = client.db(databaseName);
         const collection = database.collection("PendingOrders");
         
         const result = await collection.updateOne(
@@ -1525,7 +1531,7 @@ app.put('/api/orders/:orderId/status', async (req, res) => {
 app.get('/api/orders/with-proof', async (req, res) => {
     try {
         
-        const database = client.db("MyProductsDb");
+        const database = client.db(databaseName);
         const collection = database.collection("PendingOrders");
         
         // Find orders that have proofOfPayment field and it's not null/empty
@@ -1573,7 +1579,7 @@ app.put('/api/orders/:orderId/verify-payment', async (req, res) => {
         const { ObjectId } = require('mongodb');
         const { verified, verifiedBy, verificationNotes } = req.body;
         
-        const database = client.db("MyProductsDb");
+        const database = client.db(databaseName);
         const collection = database.collection("PendingOrders");
         
         const updateData = {
@@ -1617,7 +1623,7 @@ app.post('/api/orders/migrate', async (req, res) => {
             return res.status(400).json({ error: "Invalid userCarts data" });
         }
         
-        const database = client.db("MyProductsDb");
+        const database = client.db(databaseName);
         const collection = database.collection("PendingOrders");
         
         let totalMigrated = 0;
@@ -1723,7 +1729,7 @@ app.post('/api/staff/login', async (req, res) => {
             });
         }
         
-        const database = client.db("MyProductsDb");
+        const database = client.db(databaseName);
         const collection = database.collection("StaffCredentials");
         
         // Find user with matching username
@@ -1790,10 +1796,10 @@ app.post('/api/user-addresses', async (req, res) => {
             return res.status(400).json({ success: false, error: 'Missing userId or email' });
         }
         
-        const database = client.db('MyProductsDb');
+        const database = client.db(databaseName);
         const collection = database.collection('UserAddresses');
 
-        console.log('📮 Saving address to database: MyProductsDb, collection: UserAddresses');
+        console.log(`📮 Saving address to database: ${databaseName}, collection: UserAddresses`);
         console.log('📮 User identifier:', { userId, email });
 
         // Build query for finding existing addresses to unset default
@@ -1843,7 +1849,7 @@ app.post('/api/user-addresses', async (req, res) => {
         
         const result = await collection.insertOne(doc);
         console.log('✅ Address saved successfully! Inserted ID:', result.insertedId);
-        console.log('📮 Database: MyProductsDb, Collection: UserAddresses');
+        console.log(`📮 Database: ${databaseName}, Collection: UserAddresses`);
         
         res.json({ success: true, message: 'Address saved successfully', addressId: result.insertedId });
     } catch (error) {
@@ -1862,7 +1868,7 @@ app.get('/api/user-addresses', async (req, res) => {
             return res.status(400).json({ error: 'Missing userId or email' });
         }
         
-        const database = client.db('MyProductsDb');
+        const database = client.db(databaseName);
         const collection = database.collection('UserAddresses');
         
         // Build query - support both userId and email
@@ -1894,7 +1900,7 @@ app.get('/api/user-addresses', async (req, res) => {
 app.delete('/api/user-addresses/:id', async (req, res) => {
     try {
         const { id } = req.params;
-        const database = client.db('MyProductsDb');
+        const database = client.db(databaseName);
         const collection = database.collection('UserAddresses');
         
         console.log('🗑️ Deleting address with id:', id);
@@ -1935,7 +1941,7 @@ app.delete('/api/user-addresses/:id', async (req, res) => {
 app.put('/api/user-addresses/:id/default', async (req, res) => {
     try {
         const { id } = req.params;
-        const database = client.db('MyProductsDb');
+        const database = client.db(databaseName);
         const collection = database.collection('UserAddresses');
         
         // Try to find address by id field first (custom id like "addr_...")
@@ -1988,7 +1994,7 @@ app.post('/api/orders/accepted', async (req, res) => {
             return res.status(400).json({ error: "Order data is required" });
         }
         
-        const database = client.db("MyProductsDb");
+        const database = client.db(databaseName);
         const collection = database.collection("AcceptedOrders");
         
         // Ensure the order has the correct status and approval metadata
@@ -2021,7 +2027,7 @@ app.get('/api/orders/accepted/:orderId', async (req, res) => {
         const { ObjectId } = require('mongodb');
         const orderId = req.params.orderId;
         
-        const database = client.db("MyProductsDb");
+        const database = client.db(databaseName);
         const collection = database.collection("AcceptedOrders");
         
         const order = await collection.findOne({ _id: new ObjectId(orderId) });
@@ -2045,7 +2051,7 @@ app.delete('/api/orders/pending/:orderId', async (req, res) => {
         const orderId = req.params.orderId;
         
         
-        const database = client.db("MyProductsDb");
+        const database = client.db(databaseName);
         const collection = database.collection("PendingOrders");
         
         const result = await collection.deleteOne({ _id: new ObjectId(orderId) });
@@ -2077,7 +2083,7 @@ app.post('/api/orders/delivered', async (req, res) => {
             return res.status(400).json({ error: "Order data is required" });
         }
         
-        const database = client.db("MyProductsDb");
+        const database = client.db(databaseName);
         const collection = database.collection("DeliveredOrders");
         
         // Ensure the order has the correct status and delivery metadata
@@ -2110,7 +2116,7 @@ app.get('/api/orders/delivered/:orderId', async (req, res) => {
         const { ObjectId } = require('mongodb');
         const orderId = req.params.orderId;
         
-        const database = client.db("MyProductsDb");
+        const database = client.db(databaseName);
         const collection = database.collection("DeliveredOrders");
         
         const order = await collection.findOne({ _id: new ObjectId(orderId) });
@@ -2134,7 +2140,7 @@ app.delete('/api/orders/accepted/:orderId', async (req, res) => {
         const orderId = req.params.orderId;
         
         
-        const database = client.db("MyProductsDb");
+        const database = client.db(databaseName);
         const collection = database.collection("AcceptedOrders");
         
         const result = await collection.deleteOne({ _id: new ObjectId(orderId) });
@@ -2171,7 +2177,7 @@ app.post('/api/orders/walkin', async (req, res) => {
             return res.status(400).json({ error: "Missing required fields: fullName and itemsordered" });
         }
         
-        const database = client.db("MyProductsDb");
+        const database = client.db(databaseName);
         const collection = database.collection("WalkInOrders");
         
         // Ensure walk-in order has proper structure and timestamps
@@ -2207,7 +2213,7 @@ app.post('/api/orders/walkin', async (req, res) => {
 app.get('/api/orders/walkin', async (req, res) => {
     try {
         
-        const database = client.db("MyProductsDb");
+        const database = client.db(databaseName);
         const collection = database.collection("WalkInOrders");
         
         const walkInOrders = await collection.aggregate([
@@ -2228,7 +2234,7 @@ app.get('/api/orders/walkin', async (req, res) => {
 app.get('/api/orders/walkin/stats', async (req, res) => {
     try {
         
-        const database = client.db("MyProductsDb");
+        const database = client.db(databaseName);
         const collection = database.collection("WalkInOrders");
         
         const totalCount = await collection.countDocuments({});
@@ -2265,7 +2271,7 @@ app.get('/api/orders/walkin/stats', async (req, res) => {
 app.get('/api/orders/stats/comprehensive', async (req, res) => {
     try {
         
-        const database = client.db("MyProductsDb");
+        const database = client.db(databaseName);
         
         // Get counts from all order collections
         const pendingCollection = database.collection("PendingOrders");
@@ -2336,7 +2342,7 @@ app.get('/api/orders/stats/comprehensive', async (req, res) => {
 app.get('/api/orders/all-collections', async (req, res) => {
     try {
         
-        const database = client.db("MyProductsDb");
+        const database = client.db(databaseName);
         const pendingCollection = database.collection("PendingOrders");
         const acceptedCollection = database.collection("AcceptedOrders");
         const deliveredCollection = database.collection("DeliveredOrders");
@@ -2402,7 +2408,7 @@ app.put('/api/orders/:orderId/status', async (req, res) => {
             return res.status(400).json({ error: "Status is required" });
         }
         
-        const database = client.db("MyProductsDb");
+        const database = client.db(databaseName);
         
         // Try to find the order in all collections
         const collections = [
@@ -2463,7 +2469,7 @@ app.get('/api/orders/analytics', async (req, res) => {
         
         const { startDate, endDate } = req.query;
         
-        const database = client.db("MyProductsDb");
+        const database = client.db(databaseName);
         
         // Build date filter if provided
         let dateFilter = {};
@@ -2521,7 +2527,7 @@ app.post('/api/orders/move', async (req, res) => {
             return res.status(400).json({ error: "Missing required fields: orderId, operation, fromCollection, toCollection" });
         }
         
-        const database = client.db("MyProductsDb");
+        const database = client.db(databaseName);
         
         // Map collection names to actual MongoDB collection names
         const collectionMapping = {
@@ -2647,7 +2653,7 @@ app.get('/api/orders/:orderId/return-documentation', async (req, res) => {
             return res.status(400).json({ error: "Order ID is required" });
         }
         
-        const database = client.db("MyProductsDb");
+        const database = client.db(databaseName);
         const returnedOrdersCollection = database.collection("ReturnedOrders");
         
         // Find the returned order
@@ -2684,7 +2690,7 @@ app.get('/api/orders/:orderId/return-documentation', async (req, res) => {
 app.get('/api/orders/returned', async (req, res) => {
     try {
 
-        const database = client.db("MyProductsDb");
+        const database = client.db(databaseName);
         const returnedOrdersCollection = database.collection("ReturnedOrders");
 
         // Get all returned orders, sorted by most recent first
@@ -2754,7 +2760,7 @@ app.post('/api/orders/return-request', async (req, res) => {
             });
         }
 
-        const database = client.db("MyProductsDb");
+        const database = client.db(databaseName);
 
         // Find the original order in any collection
         const collections = [
@@ -2868,7 +2874,7 @@ app.post('/api/orders/cancel-request', async (req, res) => {
             });
         }
 
-        const database = client.db("MyProductsDb");
+        const database = client.db(databaseName);
 
         // Find the original order in any collection
         const collections = [
@@ -3004,7 +3010,7 @@ app.post('/api/orders/check-cancellation-requests', async (req, res) => {
             });
         }
 
-        const database = client.db("MyProductsDb");
+        const database = client.db(databaseName);
         const cancellationRequestsCollection = database.collection("CancellationRequests");
         const { ObjectId } = require('mongodb');
 
@@ -3047,7 +3053,7 @@ app.post('/api/orders/check-cancellation-requests', async (req, res) => {
 app.get('/api/orders/cancellation-requests', async (req, res) => {
     try {
 
-        const database = client.db("MyProductsDb");
+        const database = client.db(databaseName);
         const cancellationRequestsCollection = database.collection("CancellationRequests");
 
         const cancellationRequests = await cancellationRequestsCollection.aggregate([
@@ -3086,7 +3092,7 @@ app.put('/api/orders/return-request/:requestId', async (req, res) => {
             });
         }
 
-        const database = client.db("MyProductsDb");
+        const database = client.db(databaseName);
         const returnRequestsCollection = database.collection("ReturnRequests");
         const returnedOrdersCollection = database.collection("ReturnedOrders");
 
@@ -3264,7 +3270,7 @@ app.put('/api/orders/cancellation-request/:requestId', async (req, res) => {
             });
         }
 
-        const database = client.db("MyProductsDb");
+        const database = client.db(databaseName);
         const cancellationRequestsCollection = database.collection("CancellationRequests");
 
         // Find the cancellation request
@@ -3446,7 +3452,7 @@ app.post('/api/auth/create-verification-code', async (req, res) => {
         // Generate 4-digit verification code
         const verificationCode = Math.floor(1000 + Math.random() * 9000);
         
-        const database = client.db("MyProductsDb");
+        const database = client.db(databaseName);
         const authCodesCollection = database.collection("AuthCodes");
         
         // Check if there's an existing code for this email
@@ -3562,7 +3568,7 @@ app.post('/api/auth/verify-code', async (req, res) => {
             });
         }
         
-        const database = client.db("MyProductsDb");
+        const database = client.db(databaseName);
         const authCodesCollection = database.collection("AuthCodes");
         
         // Find the verification code entry
@@ -3948,7 +3954,7 @@ app.get('/api/staff/notifications', async (req, res) => {
     try {
         console.log('🔔 Fetching staff notifications');
 
-        const database = client.db("MyProductsDb");
+        const database = client.db(databaseName);
         const staffNotificationsCollection = database.collection("StaffNotifications");
 
         // Get all unread notifications, sorted by creation date (newest first)
@@ -3982,7 +3988,7 @@ app.put('/api/staff/notifications/:notificationId/read', async (req, res) => {
 
         console.log(`📖 Marking notification ${notificationId} as read`);
 
-        const database = client.db("MyProductsDb");
+        const database = client.db(databaseName);
         const staffNotificationsCollection = database.collection("StaffNotifications");
 
         const result = await staffNotificationsCollection.updateOne(
@@ -4017,7 +4023,7 @@ app.put('/api/staff/notifications/:notificationId/read', async (req, res) => {
 app.get('/api/staff/notifications/all', async (req, res) => {
     try {
 
-        const database = client.db("MyProductsDb");
+        const database = client.db(databaseName);
         const staffNotificationsCollection = database.collection("StaffNotifications");
 
         // Get all notifications, sorted by creation date (newest first)
