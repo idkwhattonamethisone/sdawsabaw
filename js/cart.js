@@ -27,6 +27,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     async function displayCart() {
         if (!cartItemsContainer) return;
 
+        const cartTitle = document.getElementById('cartTitle');
+        if (cartTitle) {
+            cartTitle.textContent = cartItems.length === 0 ? 'Shopping Cart' : `Shopping Cart (${cartItems.length})`;
+        }
+
         if (cartItems.length === 0) {
             if (emptyCartDiv) emptyCartDiv.style.display = 'block';
             if (cartContent) cartContent.style.display = 'none';
@@ -76,6 +81,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                             <input type="number" class="quantity-input" value="${item.quantity}" min="1" data-item-id="${item.id}">
                             <button class="plus-btn" data-item-id="${item.id}">+</button>
                         </div>
+                        <div class="stock-indicator" data-item-id="${item.id}">Loading stock...</div>
                     </td>
                     <td class="subtotal-cell">${formatPHPPrice(itemTotal)}</td>
                     <td class="remove-cell">
@@ -84,6 +90,19 @@ document.addEventListener('DOMContentLoaded', async () => {
                 </tr>
             `;
         }).join('');
+
+        // Fetch and display stock for each item
+        cartItemsContainer.querySelectorAll('.stock-indicator').forEach(async (indicator) => {
+            const itemId = indicator.getAttribute('data-item-id');
+            try {
+                const response = await fetch(`http://localhost:3000/api/products/${itemId}`);
+                const product = await response.json();
+                const stock = product.stock !== undefined ? product.stock : (product.stockQuantity || 0);
+                indicator.textContent = stock > 0 ? `In stock: ${stock}` : 'Out of stock';
+            } catch (error) {
+                indicator.textContent = 'Stock unavailable';
+            }
+        });
 
         // After rendering, add event listeners for checkboxes
         cartItemsContainer.querySelectorAll('.cart-item-checkbox').forEach(checkbox => {
@@ -318,7 +337,18 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Clear cart functionality
     if (clearCartBtn) {
         clearCartBtn.addEventListener('click', function() {
-            if (confirm('Are you sure you want to clear your cart?')) {
+            const orderConfirmDialog = document.getElementById('orderConfirmDialog');
+            if (orderConfirmDialog) {
+                orderConfirmDialog.showModal();
+            }
+        });
+    }
+
+    // Handle order confirmation dialog
+    const orderConfirmDialog = document.getElementById('orderConfirmDialog');
+    if (orderConfirmDialog) {
+        orderConfirmDialog.addEventListener('close', () => {
+            if (orderConfirmDialog.returnValue === 'yes') {
                 myCart.clearCart();
                 cartItems = myCart.getItems();
                 displayCart();
@@ -327,6 +357,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
         });
     }
+
+
 
     // Checkout button functionality
     if (checkoutBtn) {
