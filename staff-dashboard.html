@@ -4247,7 +4247,7 @@
                     </tr>
                 `).join('');
 
-                this.updatePagination('productsPagination', filteredProducts.length);
+                this.updatePagination('productsPagination', filteredProducts.length, () => this.renderProducts());
                 
                 // Hide loading animations after products are rendered
                 this.hideLoadingProducts();
@@ -4368,7 +4368,7 @@
                     } else {
                         tbody.innerHTML = '<tr><td colspan="9" class="no-data">No orders found</td></tr>';
                     }
-                    this.updatePagination('ordersPagination', filteredOrders.length);
+                this.updatePagination('ordersPagination', filteredOrders.length, () => this.renderOrders());
                     return;
                 }
 
@@ -4461,7 +4461,7 @@
                     `;
                 }).join('');
 
-                this.updatePagination('ordersPagination', filteredOrders.length);
+                this.updatePagination('ordersPagination', filteredOrders.length, () => this.renderOrders());
                 console.log('✅ Orders rendered:', displayed.length, 'orders displayed');
             }
 
@@ -4591,7 +4591,7 @@
                     `;
                 }).join('');
 
-                this.updatePagination('returnsPagination', filteredReturns.length);
+                this.updatePagination('returnsPagination', filteredReturns.length, () => this.renderReturns());
             }
 
             renderPOSProducts(category = 'all') {
@@ -4998,10 +4998,10 @@
                 }
             }
 
-            updatePagination(containerId, totalItems) {
+            updatePagination(containerId, totalItems, renderCallback = null) {
                 const container = document.getElementById(containerId);
                 const totalPages = Math.ceil(totalItems / this.itemsPerPage);
-                
+
                 if (totalPages <= 1) {
                     container.innerHTML = '';
                     return;
@@ -5014,7 +5014,11 @@
                     button.className = `page-btn ${i === this.currentPage ? 'active' : ''}`;
                     button.onclick = () => {
                         this.currentPage = i;
-                        this.renderCurrentSection();
+                        if (renderCallback) {
+                            renderCallback();
+                        } else {
+                            this.renderCurrentSection();
+                        }
                     };
                     container.appendChild(button);
                 }
