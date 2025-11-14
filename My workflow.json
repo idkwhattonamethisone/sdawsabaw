@@ -1,0 +1,204 @@
+{
+  "name": "My workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "multipleMethods": true,
+        "httpMethod": [
+          "POST"
+        ],
+        "path": "send-verification-email",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "4bc9a077-8422-4119-be91-daf83b1aaea9",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.1,
+      "position": [
+        -400,
+        112
+      ],
+      "webhookId": "verification-email-webhook"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "condition-1",
+              "leftValue": "={{ $json.body.type }}",
+              "rightValue": "verification",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "c22249f3-b9c1-45d0-bf0d-bbcc0de5f550",
+      "name": "Check Email Type",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -208,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.body.to }}",
+        "subject": "=Verify Your Email - Sanrico Mercantile",
+        "message": "=<!DOCTYPE html>\n<html>\n<head>\n  <meta charset=\"UTF-8\">\n  <title>Email Verification - Sanrico Mercantile</title>\n  <style>\n    body {\n      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;\n      background: linear-gradient(135deg, #dc2626 0%, #991b1b 50%, #7f1d1d 100%);\n      margin: 0;\n      padding: 20px;\n      min-height: 100vh;\n    }\n    .container {\n      max-width: 600px;\n      margin: 0 auto;\n      background: white;\n      border-radius: 20px;\n      padding: 50px;\n      box-shadow: 0 25px 60px rgba(220, 38, 38, 0.2);\n      text-align: center;\n      border-top: 5px solid #dc2626;\n      position: relative;\n      overflow: hidden;\n    }\n    .container::before {\n      content: '';\n      position: absolute;\n      top: 0;\n      left: 0;\n      right: 0;\n      height: 3px;\n      background: linear-gradient(90deg, #dc2626, #ef4444, #dc2626);\n    }\n    .company-name {\n      color: #dc2626;\n      font-size: 36px;\n      font-weight: 800;\n      margin-bottom: 15px;\n      text-shadow: 0 2px 4px rgba(220, 38, 38, 0.1);\n      letter-spacing: -0.5px;\n    }\n    .subtitle {\n      color: #6b7280;\n      font-size: 18px;\n      margin-bottom: 40px;\n      font-weight: 500;\n    }\n    .header-title {\n      color: #1f2937;\n      margin: 40px 0 30px;\n      font-size: 28px;\n      font-weight: 700;\n    }\n    .greeting {\n      font-size: 20px;\n      color: #374151;\n      margin-bottom: 25px;\n      font-weight: 500;\n    }\n    .message {\n      color: #4b5563;\n      font-size: 16px;\n      line-height: 1.7;\n      margin: 25px 0 40px;\n      max-width: 500px;\n      margin-left: auto;\n      margin-right: auto;\n    }\n    /* CODE AREA - BORDER ONLY, NO BACKGROUND */\n    .verification-code {\n      border: 4px solid #dc2626;\n      background: transparent;\n      color: #dc2626;\n      font-size: 48px;\n      font-weight: 900;\n      font-family: 'Courier New', monospace;\n      text-align: center;\n      padding: 30px 40px;\n      border-radius: 15px;\n      letter-spacing: 12px;\n      margin: 40px auto;\n      max-width: 280px;\n      box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.1);\n      transition: all 0.3s ease;\n      position: relative;\n    }\n    .verification-code::before {\n      content: '';\n      position: absolute;\n      top: -2px;\n      left: -2px;\n      right: -2px;\n      bottom: -2px;\n      border: 1px solid #fecaca;\n      border-radius: 17px;\n      z-index: -1;\n    }\n    .code-label {\n      color: #dc2626;\n      font-size: 14px;\n      font-weight: 700;\n      text-transform: uppercase;\n      letter-spacing: 2px;\n      margin-bottom: 15px;\n    }\n    .instructions {\n      color: #4b5563;\n      font-size: 16px;\n      line-height: 1.6;\n      margin: 30px 0;\n    }\n    .highlight {\n      color: #dc2626;\n      font-weight: 700;\n    }\n    .expiry-warning {\n      background: linear-gradient(45deg, #fef3c7, #fde68a);\n      color: #92400e;\n      padding: 20px;\n      border-radius: 12px;\n      font-weight: 600;\n      margin: 30px 0;\n      border-left: 4px solid #f59e0b;\n      font-size: 15px;\n    }\n    .security-note {\n      background: #fee2e2;\n      color: #7f1d1d;\n      padding: 18px;\n      border-radius: 12px;\n      font-size: 14px;\n      margin: 25px 0;\n      border: 1px solid #fecaca;\n    }\n    .footer {\n      margin-top: 50px;\n      padding-top: 30px;\n      border-top: 2px solid #fecaca;\n      color: #6b7280;\n      font-size: 14px;\n    }\n    .brand {\n      color: #dc2626;\n      font-weight: 700;\n    }\n    .divider {\n      width: 60px;\n      height: 3px;\n      background: linear-gradient(90deg, #dc2626, #ef4444);\n      margin: 25px auto;\n      border-radius: 2px;\n    }\n    /* COOL ACCENT ELEMENTS */\n    .accent-dot {\n      width: 8px;\n      height: 8px;\n      background: #dc2626;\n      border-radius: 50%;\n      display: inline-block;\n      margin: 0 8px;\n      opacity: 0.6;\n    }\n  </style>\n</head>\n<body>\n  <div class=\"container\">\n    <!-- COMPANY NAME ONLY -->\n    <div class=\"company-name\">Sanrico Mercantile</div>\n    <div class=\"subtitle\">Hardware & Mercantile Store</div>\n\n    <div class=\"divider\"></div>\n\n    <h1 class=\"header-title\">Email Verification Required</h1>\n\n    <p class=\"greeting\">Hello <strong>{{ $json.body.userName || 'Valued Customer' }}</strong>,</p>\n\n    <p class=\"message\">\n      Thank you for registering with <span class=\"brand\">Sanrico Mercantile</span>!\n      To complete your account setup and start shopping with us, please verify your email\n      address using the verification code below:\n    </p>\n\n    <!-- CODE AREA - BORDER ONLY -->\n    <div class=\"code-label\">Verification Code</div>\n    <div class=\"verification-code\">{{ $('Webhook').first().json.body.verificationCode }}</div>\n\n    <p class=\"instructions\">\n      Enter this <span class=\"highlight\">4-digit code</span> in the verification dialog on our website to activate your account.\n    </p>\n\n    <div class=\"expiry-warning\">\n      ⏰ <strong>Important:</strong> This code will expire in <strong>15 minutes</strong> for security purposes.\n    </div>\n\n    <div class=\"security-note\">\n      🔒 If you didn't create an account with Sanrico Mercantile, please ignore this email and no account will be created.\n    </div>\n\n    <div class=\"divider\"></div>\n\n    <div class=\"footer\">\n      <p><strong>Best regards,</strong></p>\n      <p>The <span class=\"brand\">Sanrico Mercantile</span> Team</p>\n\n      <div style=\"margin: 20px 0;\">\n        <span class=\"accent-dot\"></span>\n        <span class=\"accent-dot\"></span>\n        <span class=\"accent-dot\"></span>\n\n...\n\nLet me reevaluate and take a different approach.\n\nHere’s the same HTML, neatly formatted and with the corrected n8n expressions for name and code:\n\n```html\n<!DOCTYPE html>\n<html>\n<head>\n  <meta charset=\"UTF-8\">\n  <title>Email Verification - Sanrico Mercantile</title>\n  <style>\n    body {\n      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;\n      background: linear-gradient(135deg, #dc2626 0%, #991b1b 50%, #7f1d1d 100%);\n      margin: 0;\n      padding: 20px;\n      min-height: 100vh;\n    }\n    .container {\n      max-width: 600px;\n      margin: 0 auto;\n      background: white;\n      border-radius: 20px;\n      padding: 50px;\n      box-shadow: 0 25px 60px rgba(220, 38, 38, 0.2);\n      text-align: center;\n      border-top: 5px solid #dc2626;\n      position: relative;\n      overflow: hidden;\n    }\n    .container::before {\n      content: '';\n      position: absolute;\n      top: 0;\n      left: 0;\n      right: 0;\n      height: 3px;\n      background: linear-gradient(90deg, #dc2626, #ef4444, #dc2626);\n    }\n    .company-name {\n      color: #dc2626;\n      font-size: 36px;\n      font-weight: 800;\n      margin-bottom: 15px;\n      text-shadow: 0 2px 4px rgba(220, 38, 38, 0.1);\n      letter-spacing: -0.5px;\n    }\n    .subtitle {\n      color: #6b7280;\n      font-size: 18px;\n      margin-bottom: 40px;\n      font-weight: 500;\n    }\n    .header-title {\n      color: #1f2937;\n      margin: 40px 0 30px;\n      font-size: 28px;\n      font-weight: 700;\n    }\n    .greeting {\n      font-size: 20px;\n      color: #374151;\n      margin-bottom: 25px;\n      font-weight: 500;\n    }\n    .message {\n      color: #4b5563;\n      font-size: 16px;\n      line-height: 1.7;\n      margin: 25px 0 40px;\n      max-width: 500px;\n      margin-left: auto;\n      margin-right: auto;\n    }\n    /* CODE AREA - BORDER ONLY, NO BACKGROUND */\n    .verification-code {\n      border: 4px solid #dc2626;\n      background: transparent;\n      color: #dc2626;\n      font-size: 48px;\n      font-weight: 900;\n      font-family: 'Courier New', monospace;\n      text-align: center;\n      padding: 30px 40px;\n      border-radius: 15px;\n      letter-spacing: 12px;\n      margin: 40px auto;\n      max-width: 280px;\n      box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.1);\n      transition: all 0.3s ease;\n      position: relative;\n    }\n    .verification-code::before {\n      content: '';\n      position: absolute;\n      top: -2px;\n      left: -2px;\n      right: -2px;\n      bottom: -2px;\n      border: 1px solid #fecaca;\n      border-radius: 17px;\n      z-index: -1;\n    }\n    .code-label {\n      color: #dc2626;\n      font-size: 14px;\n      font-weight: 700;\n      text-transform: uppercase;\n      letter-spacing: 2px;\n      margin-bottom: 15px;\n    }\n    .instructions {\n      color: #4b5563;\n      font-size: 16px;\n      line-height: 1.6;\n      margin: 30px 0;\n    }\n    .highlight {\n      color: #dc2626;\n      font-weight: 700;\n    }\n    .expiry-warning {\n      background: linear-gradient(45deg, #fef3c7, #fde68a);\n      color: #92400e;\n      padding: 20px;\n      border-radius: 12px;\n      font-weight: 600;\n      margin: 30px 0;\n      border-left: 4px solid #f59e0b;\n      font-size: 15px;\n    }\n    .security-note {\n      background: #fee2e2;\n      color: #7f1d1d;\n      padding: 18px;\n      border-radius: 12px;\n      font-size: 14px;\n      margin: 25px 0;\n      border: 1px solid #fecaca;\n    }\n    .footer {\n      margin-top: 50px;\n      padding-top: 30px;\n      border-top: 2px solid #fecaca;\n      color: #6b7280;\n      font-size: 14px;\n    }\n    .brand {\n      color: #dc2626;\n      font-weight: 700;\n    }\n    .divider {\n      width: 60px;\n      height: 3px;\n      background: linear-gradient(90deg, #dc2626, #ef4444);\n      margin: 25px auto;\n      border-radius: 2px;\n    }\n    /* COOL ACCENT ELEMENTS */\n    .accent-dot {\n      width: 8px;\n      height: 8px;\n      background: #dc2626;\n      border-radius: 50%;\n      display: inline-block;\n      margin: 0 8px;\n      opacity: 0.6;\n    }\n  </style>\n</head>\n<body>\n  <div class=\"container\">\n    <!-- COMPANY NAME ONLY -->\n    <div class=\"company-name\">Sanrico Mercantile</div>\n    <div class=\"subtitle\">Hardware & Mercantile Store</div>\n\n    <div class=\"divider\"></div>\n\n    <h1 class=\"header-title\">Email Verification Required</h1>\n\n    <p class=\"greeting\">Hello <strong>{{ $json.body.userName || 'Valued Customer' }}</strong>,</p>\n\n    <p class=\"message\">\n      Thank you for registering with <span class=\"brand\">Sanrico Mercantile</span>! To complete your account setup and start shopping with us, please verify your email address using the verification code below:\n    </p>\n\n    <!-- CODE AREA - BORDER ONLY -->\n    <div class=\"code-label\">Verification Code</div>\n    <div class=\"verification-code\">{{ $json.body.verificationCode }}</div>\n\n    <p class=\"instructions\">\n      Enter this <span class=\"highlight\">4-digit code</span> in the verification dialog on our website to activate your account.\n    </p>\n\n    <div class=\"expiry-warning\">\n      ⏰ <strong>Important:</strong> This code will expire in <strong>15 minutes</strong> for security purposes.\n    </div>\n\n    <div class=\"security-note\">\n      🔒 If you didn't create an account with Sanrico Mercantile, please ignore this email and no account will be created.\n    </div>\n\n    <div class=\"divider\"></div>\n\n    <div class=\"footer\">\n      <p><strong>Best regards,</strong></p>\n      <p>The <span class=\"brand\">Sanrico Mercantile</span> Team</p>\n\n      <div style=\"margin: 20px 0;\">\n        <span class=\"accent-dot\"></span>\n        <span class=\"accent-dot\"></span>\n        <span class=\"accent-dot\"></span>\n        <span class=\"accent-dot\"></span>\n      </div>\n\n      <p style=\"font-size: 12px; color: #9ca3af; margin-top: 20px;\">\n        This is an automated email. Please do not reply to this message.\n      </p>\n      <p style=\"font-size: 12px; color: #9ca3af;\">\n        © 2024 Sanrico Mercantile. All rights reserved.\n      </p>\n    </div>\n  </div>\n</body>\n</html>",
+        "options": {
+          "appendAttribution": false,
+          "attachmentsUi": {
+            "attachmentsBinary": []
+          }
+        }
+      },
+      "id": "c31ca339-4de5-4ba5-8dac-d15ab0659d26",
+      "name": "Send Verification Email",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "e640f57e-365e-476e-81c8-cd3c913e3ba1",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "zV7azOBw2R3BTLIt",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.body.to }}",
+        "subject": "Password Reset - Sanrico Mercantile",
+        "message": "=<!DOCTYPE html>\n<html>\n<head>\n    <meta charset=\"UTF-8\">\n    <title>Password Reset - Sanrico Mercantile</title>\n    <style>\n        body {\n            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;\n            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);\n            margin: 0;\n            padding: 20px;\n            min-height: 100vh;\n        }\n        .container {\n            max-width: 600px;\n            margin: 0 auto;\n            background: white;\n            border-radius: 20px;\n            padding: 40px;\n            box-shadow: 0 20px 60px rgba(0,0,0,0.1);\n            text-align: center;\n        }\n        .logo {\n            color: #3498db;\n            font-size: 32px;\n            font-weight: bold;\n            margin-bottom: 10px;\n        }\n        .subtitle {\n            color: #666;\n            font-size: 16px;\n            margin-bottom: 30px;\n        }\n        .reset-button {\n            background: linear-gradient(45deg, #e74c3c, #c0392b);\n            color: white;\n            text-decoration: none;\n            padding: 20px 40px;\n            border-radius: 15px;\n            display: inline-block;\n            font-weight: bold;\n            font-size: 18px;\n            margin: 30px 0;\n            box-shadow: 0 10px 30px rgba(231, 76, 60, 0.3);\n        }\n        .instructions {\n            color: #555;\n            font-size: 16px;\n            line-height: 1.6;\n            margin: 20px 0;\n        }\n        .link-box {\n            background: #f8f9fa;\n            padding: 15px;\n            border-radius: 10px;\n            word-break: break-all;\n            font-family: monospace;\n            font-size: 14px;\n            color: #666;\n            margin: 20px 0;\n        }\n        .expiry {\n            background: rgba(243, 156, 18, 0.1);\n            color: #f39c12;\n            padding: 15px;\n            border-radius: 10px;\n            font-weight: 600;\n            margin: 20px 0;\n        }\n        .footer {\n            margin-top: 40px;\n            padding-top: 30px;\n            border-top: 1px solid #eee;\n            color: #888;\n            font-size: 14px;\n        }\n        .brand {\n            color: #3498db;\n            font-weight: 600;\n        }\n    </style>\n</head>\n<body>\n    <div class=\"container\">\n        <div class=\"logo\">🏪 Sanrico Mercantile</div>\n        <div class=\"subtitle\">Hardware & Mercantile Store</div>\n        \n        <h2 style=\"color: #2c3e50; margin: 30px 0;\">Password Reset Request</h2>\n        \n        <p class=\"instructions\">Hello <strong>{{ $json.userName || 'Valued Customer' }}</strong>,</p>\n        \n        <p class=\"instructions\">We received a request to reset your password for your Sanrico Mercantile account. Click the button below to create a new password:</p>\n        \n        <a href=\"{{ $json.resetLink }}\" class=\"reset-button\">Reset Your Password</a>\n        \n        <p class=\"instructions\">If the button doesn't work, copy and paste this link into your browser:</p>\n        <div class=\"link-box\">{{ $json.resetLink }}</div>\n        \n        <div class=\"expiry\">\n            ⏰ <strong>Important:</strong> This link will expire in 1 hour for security purposes.\n        </div>\n        \n        <p class=\"instructions\">If you didn't request this password reset, please ignore this email and your password will remain unchanged.</p>\n        \n        <div class=\"footer\">\n            <p><strong>Best regards,</strong><br>The <span class=\"brand\">Sanrico Mercantile</span> Team</p>\n            <p style=\"font-size: 12px; color: #aaa;\">This is an automated email. Please do not reply to this message.</p>\n        </div>\n    </div>\n</body>\n</html>",
+        "options": {
+          "appendAttribution": false,
+          "attachmentsUi": {
+            "attachmentsBinary": []
+          }
+        }
+      },
+      "id": "0ca807ec-df73-46c6-94b4-5a0094da65fc",
+      "name": "Send Password Reset Email",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        208
+      ],
+      "webhookId": "11f2045c-da60-4fb5-9bef-5884ef7559bd",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "zV7azOBw2R3BTLIt",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "   {\n     \"success\": true,\n     \"message\": \"Email sent successfully\",\n     \"timestamp\": \"{{ $now }}\"\n   }",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "b27da887-87b6-4158-82fb-60f2f6843eb3",
+      "name": "Success Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        192,
+        96
+      ],
+      "executeOnce": false,
+      "alwaysOutputData": true
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Check Email Type",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Email Type": {
+      "main": [
+        [
+          {
+            "node": "Send Verification Email",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Password Reset Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Verification Email": {
+      "main": [
+        [
+          {
+            "node": "Success Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Password Reset Email": {
+      "main": [
+        [
+          {
+            "node": "Success Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false,
+    "errorWorkflow": "r8heF5oMKEzIiPwi",
+    "timezone": "Asia/Manila",
+    "saveExecutionProgress": true,
+    "timeSavedPerExecution": 1
+  },
+  "versionId": "89d06520-a18f-49b6-a891-ad3700952ed6",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "8f295f32d0341e5e2b492eef3a0b23127654d9a4c6ec02334bbd303a047e640a"
+  },
+  "id": "r8heF5oMKEzIiPwi",
+  "tags": []
+}
