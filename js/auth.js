@@ -92,7 +92,7 @@ class Auth {
                 // Create user object from MongoDB response
                 const staffUser = {
                     id: result.user._id,
-                    fullName: 'Staff Member',
+                    fullName: result.user.username, 
                     username: result.user.username,
                     staffId: result.user.username,
                     isStaff: result.user.isStaff,
@@ -101,7 +101,7 @@ class Auth {
                 };
                 
                 this.setCurrentUser(staffUser);
-                return { success: true, message: 'Staff login successful' };
+                return { success: true, message: `Staff login successful for ${staffUser.username}` };
             } else {
                 return { success: false, message: result.message };
             }

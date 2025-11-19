@@ -9,7 +9,7 @@ const { securityConfig, securityMiddleware } = require('./security-config');
 require('dotenv').config();
 
 const app = express();
-const port = process.env.PORT || 3000;
+const port = process.env.PORT || 5500;
 
 if (!process.env.MONGODB_URI) {
     console.error("❌ Missing required environment variable: MONGODB_URI");
@@ -1730,7 +1730,7 @@ app.post('/api/staff/login', async (req, res) => {
         }
         
         const database = client.db(databaseName);
-        const collection = database.collection("StaffCredentials");
+        const collection = database.collection("AdminUsers");
         
         // Find user with matching username
         const staffUser = await collection.findOne({ 
@@ -1744,8 +1744,15 @@ app.post('/api/staff/login', async (req, res) => {
             });
         }
         
-        // Verify password using bcrypt
-        const passwordMatch = await bcrypt.compare(sanitizedPassword, staffUser.password);
+        // Verify password using bcrypt (handle both 'password' and 'passwordHash' fields)
+        const passwordField = staffUser.password || staffUser.passwordHash;
+        if (!passwordField) {
+            return res.status(401).json({
+                success: false,
+                message: "Invalid credentials - password not set"
+            });
+        }
+        const passwordMatch = await bcrypt.compare(sanitizedPassword, passwordField);
         
         if (!passwordMatch) {
             return res.status(401).json({ 
@@ -1767,9 +1774,9 @@ app.post('/api/staff/login', async (req, res) => {
         
         // Return success with user info (excluding password)
         const { password: _, ...userInfo } = staffUser;
-        res.json({ 
-            success: true, 
-            message: "Login successful",
+        res.json({
+            success: true,
+            message: `Staff login successful for ${staffUser.username}`,
             user: userInfo
         });
         
