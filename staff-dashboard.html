@@ -2331,7 +2331,7 @@
                 if (!product || product.fullDetailsLoaded) return product;
 
                 try {
-                    const response = await fetch(`http://localhost:3000/api/products/${product.id}`);
+                    const response = await fetch(`/api/products/${product.id}`);
                     if (!response.ok) {
                         throw new Error('Failed to fetch product details');
                     }
@@ -2390,7 +2390,7 @@
                 if (!order || order.fullDetailsLoaded) return order;
 
                 try {
-                    const response = await fetch(`http://localhost:3000/api/orders/details/${order._id}`);
+                    const response = await fetch(`/api/orders/details/${order._id}`);
                     if (!response.ok) {
                         throw new Error('Failed to fetch order details');
                     }
@@ -3016,7 +3016,7 @@
             async loadStatsFromAllCollections() {
                 try {
                     // Get orders from all collections
-                    const allOrdersResponse = await fetch('http://localhost:3000/api/orders');
+                    const allOrdersResponse = await fetch('/api/orders');
                     let allOrders = [];
                     
                     if (allOrdersResponse.ok) {
@@ -3065,7 +3065,7 @@
 
                     console.log('🔄 Loading products...');
                     // Fetch all products for staff dashboard (high limit, no minimal to get all fields including images)
-                    const url = `http://localhost:3000/api/products?limit=10000&skipSort=true&minimal=true&_=${Date.now()}`;
+                    const url = `/api/products?limit=10000&skipSort=true&minimal=true&_=${Date.now()}`;
                     const response = await fetch(url, { cache: 'no-store' });
                     
                     if (!response.ok) throw new Error('Failed to fetch products');
@@ -3118,7 +3118,7 @@
 
                     console.log('🔄 Loading orders from API...');
                     // Fetch orders from all collections (pending, accepted, delivered)
-                    const ordersUrl = `http://localhost:3000/api/orders/all-staff?minimal=true&limit=1000&_=${Date.now()}`;
+                    const ordersUrl = `/api/orders/all-staff?minimal=true&limit=1000&_=${Date.now()}`;
                     const response = await fetch(ordersUrl, { cache: 'no-store' });
                     
                     if (!response.ok) {
@@ -3182,7 +3182,7 @@
 
                     console.log('🔄 Loading returns from API...');
                     // Fetch return requests for staff review
-                    const response = await fetch('http://localhost:3000/api/orders/return-requests');
+                    const response = await fetch('/api/orders/return-requests');
                     if (!response.ok) throw new Error('Failed to fetch return requests');
 
                     const data = await response.json();
@@ -4909,7 +4909,7 @@
 
                 try {
                     // Save to WalkInOrders collection
-                    const response = await fetch('http://localhost:3000/api/orders/walkin', {
+                    const response = await fetch('/api/orders/walkin', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json'
@@ -4930,7 +4930,7 @@
                         quantity: item.quantity
                     }));
                     try {
-                        const stockResponse = await fetch('http://localhost:3000/api/products/bulk-stock', {
+                        const stockResponse = await fetch('/api/products/bulk-stock', {
                             method: 'PUT',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ updates: stockUpdates })
@@ -5065,7 +5065,7 @@
                         updateData.image = previewImg.src;
                     }
                     
-                    const response = await fetch(`http://localhost:3000/api/products/${this.currentEditingProduct.id}`, {
+                    const response = await fetch(`/api/products/${this.currentEditingProduct.id}`, {
                         method: 'PUT',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(updateData)
@@ -5516,7 +5516,7 @@
                     }
                     
                     // Make API call to update status
-                    const response = await fetch('http://localhost:3000/api/orders/move', {
+                    const response = await fetch('/api/orders/move', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json'
@@ -6162,7 +6162,7 @@
                     console.log('📦 Stock updates to be processed:', stockUpdates);
 
                     // Call the bulk stock update API
-                    const response = await fetch('http://localhost:3000/api/products/bulk-stock', {
+                    const response = await fetch('/api/products/bulk-stock', {
                         method: 'PUT',
                         headers: {
                             'Content-Type': 'application/json'
@@ -6394,7 +6394,7 @@
                         payload.returnImage = returnImage;
                     }
                     
-                    const response = await fetch(`http://localhost:3000/api/orders/return-request/${requestId}`, {
+                    const response = await fetch(`/api/orders/return-request/${requestId}`, {
                         method: 'PUT',
                         headers: {
                             'Content-Type': 'application/json'
@@ -6742,7 +6742,7 @@
                     }
                     
                     // Make API call to update status
-                    const response = await fetch('http://localhost:3000/api/orders/move', {
+                    const response = await fetch('/api/orders/move', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json'
@@ -6963,7 +6963,7 @@
                                 // If not found, try to fetch from API
                                 if (!product) {
                                     try {
-                                        const response = await fetch(`http://localhost:3000/api/products/${itemIdStr}`);
+                                        const response = await fetch(`/api/products/${itemIdStr}`);
                                         if (response.ok) {
                                             const productData = await response.json();
                                             product = {

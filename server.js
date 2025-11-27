@@ -56,23 +56,23 @@ const client = new MongoClient(process.env.MONGODB_URI);
 async function connectToMongo() {
     try {
         await client.connect();
-        
+
         // Test the connection immediately
         await client.db("admin").command({ ping: 1 });
-        
+
         // Test access to our database
         const database = client.db(databaseName);
-        
+
         // Test all three order collections
         const pendingCollection = database.collection("PendingOrders");
         const acceptedCollection = database.collection("AcceptedOrders");
         const deliveredCollection = database.collection("DeliveredOrders");
-        
+
         const pendingCount = await pendingCollection.countDocuments({});
         const acceptedCount = await acceptedCollection.countDocuments({});
         const deliveredCount = await deliveredCollection.countDocuments({});
-        
-        
+
+
     } catch (error) {
         console.error("❌ Error connecting to MongoDB:", error);
         console.error("❌ Error details:", error.message);
@@ -84,10 +84,10 @@ app.get('/api/products', async (req, res) => {
     try {
         const database = client.db(databaseName);
         const collection = database.collection("Products");
-        
+
         // Build query filter
         let queryFilter = { isActive: true };
-        
+
         // Category filter support - optimized to avoid regex when possible
         if (req.query.category && req.query.category !== 'all') {
             // Support normalized category buckets
@@ -99,7 +99,7 @@ app.get('/api/products', async (req, res) => {
                 'plumbing-fixtures': { $regex: /plumbing|fixture|pipe|fitting|faucet|valve/i },
                 'fasteners-consumables': { $regex: /fastener|screw|nail|bolt|nut|consumable|adhesive|sealant|tape/i }
             };
-            
+
             // Check if it's a normalized category
             if (categoryMap[req.query.category]) {
                 queryFilter.category = categoryMap[req.query.category];
@@ -108,17 +108,17 @@ app.get('/api/products', async (req, res) => {
                 queryFilter.category = { $regex: new RegExp(`^${req.query.category}$`, 'i') };
             }
         }
-        
+
         // Parse pagination parameters with defaults
         const limit = req.query.limit ? parseInt(req.query.limit) : 12; // Default to 12 if not specified
         const skip = req.query.skip ? parseInt(req.query.skip) : 0;
-        
+
         // Check if sorting should be skipped (for performance on index page)
         const skipSort = req.query.skipSort === 'true' || req.query.noSort === 'true';
-        
+
         // Check if minimal fields should be returned (for list views - much faster)
         const minimalFields = req.query.minimal === 'true' || req.query.fields === 'minimal' || skipSort;
-        
+
         // Define projection for minimal fields (only what's needed for list views)
         const minimalProjection = {
             _id: 1,
@@ -132,7 +132,7 @@ app.get('/api/products', async (req, res) => {
             category: 1,
             isActive: 1
         };
-        
+
         // Determine sort field and direction
         let sortField = 'name';
         let sortDirection = 1;
@@ -154,74 +154,74 @@ app.get('/api/products', async (req, res) => {
                 }
             }
         }
-        
+
         // Generate ETag for caching (based on query params only - check BEFORE database query)
         // This allows server to return 304 immediately without processing
         const crypto = require('crypto');
         const cacheKey = `${limit}-${skip}-${req.query.category || 'all'}-${req.query.sortBy || 'default'}-${skipSort}-${minimalFields}`;
         const etag = crypto.createHash('md5').update(cacheKey).digest('hex');
-        
+
         // Set caching headers
         res.setHeader('Cache-Control', 'public, max-age=60'); // Cache for 60 seconds
         res.setHeader('ETag', `"${etag}"`);
-        
+
         // Check If-None-Match header BEFORE database query - return 304 immediately if cached
         const ifNoneMatch = req.headers['if-none-match'];
         if (ifNoneMatch === `"${etag}"` || ifNoneMatch === etag) {
             return res.status(304).end();
         }
-        
+
         // Use find() with sort for better performance when possible
         // Only use aggregation if we need complex operations
         let products;
         let totalCount;
-        
+
         // Run count in parallel with the query for better performance
-        const countPromise = req.query.includeMeta === 'true' 
+        const countPromise = req.query.includeMeta === 'true'
             ? collection.countDocuments(queryFilter)
             : Promise.resolve(0);
-        
+
         try {
             // Try using find() first - it's faster than aggregate for simple queries
             let query = collection.find(queryFilter);
-            
+
             // Add projection for minimal fields if requested (dramatically reduces data transfer)
             if (minimalFields) {
                 query = query.project(minimalProjection);
             }
-            
+
             // Only add sort if not skipped (for performance)
             if (!skipSort) {
                 query = query.sort({ [sortField]: sortDirection });
             }
-            
+
             query = query.skip(skip).limit(limit);
-            
+
             products = await query.toArray();
             totalCount = await countPromise;
-            
+
         } catch (error) {
             // If find() fails (e.g., memory limit), fall back to aggregation with allowDiskUse
             if (error.code === 292 || error.codeName === 'QueryExceededMemoryLimitNoDiskUseAllowed') {
                 console.warn('⚠️ Using aggregation fallback for products query');
-                
+
                 const pipeline = [
                     { $match: queryFilter }
                 ];
-                
+
                 // Add projection for minimal fields if requested
                 if (minimalFields) {
                     pipeline.push({ $project: minimalProjection });
                 }
-                
+
                 // Only add sort if not skipped
                 if (!skipSort) {
                     pipeline.push({ $sort: { [sortField]: sortDirection } });
                 }
-                
+
                 pipeline.push({ $skip: skip });
                 pipeline.push({ $limit: limit });
-                
+
                 try {
                     products = await collection.aggregate(pipeline, { allowDiskUse: true }).toArray();
                     totalCount = await countPromise;
@@ -229,22 +229,22 @@ app.get('/api/products', async (req, res) => {
                     // Last resort: fetch limited batch and sort in memory
                     if (aggError.code === 292 || aggError.codeName === 'QueryExceededMemoryLimitNoDiskUseAllowed') {
                         console.warn('⚠️ allowDiskUse not supported, using in-memory sort fallback');
-                        
+
                         // Fetch only what we need + a small buffer for pagination
                         const fetchLimit = Math.min(skip + limit + 100, 1000); // Max 1000 for performance
                         const noSortPipeline = [
                             { $match: queryFilter }
                         ];
-                        
+
                         // Add projection for minimal fields if requested
                         if (minimalFields) {
                             noSortPipeline.push({ $project: minimalProjection });
                         }
-                        
+
                         noSortPipeline.push({ $limit: fetchLimit });
-                        
+
                         let fetchedProducts = await collection.aggregate(noSortPipeline).toArray();
-                        
+
                         // Sort in memory
                         fetchedProducts.sort((a, b) => {
                             const aVal = a[sortField];
@@ -256,7 +256,7 @@ app.get('/api/products', async (req, res) => {
                             const diff = (aVal || '').localeCompare(bVal || '');
                             return diff * sortDirection;
                         });
-                        
+
                         // Apply pagination
                         products = fetchedProducts.slice(skip, skip + limit);
                         totalCount = await countPromise;
@@ -268,7 +268,7 @@ app.get('/api/products', async (req, res) => {
                 throw error;
             }
         }
-        
+
         // Return products with pagination metadata
         if (req.query.includeMeta === 'true') {
             res.json({
@@ -292,15 +292,15 @@ app.get('/api/products/:id', async (req, res) => {
         const { ObjectId } = require('mongodb');
         const database = client.db(databaseName);
         const collection = database.collection("Products");
-        const product = await collection.findOne({ 
-            _id: new ObjectId(req.params.id), 
-            isActive: true 
+        const product = await collection.findOne({
+            _id: new ObjectId(req.params.id),
+            isActive: true
         });
-        
+
         if (!product) {
             return res.status(404).json({ error: "Product not found" });
         }
-        
+
         res.json(product);
     } catch (error) {
         console.error("Error fetching product:", error);
@@ -310,62 +310,62 @@ app.get('/api/products/:id', async (req, res) => {
 
 // API endpoint to bulk update stock (for checkout) - MUST BE BEFORE :id route
 app.put('/api/products/bulk-stock', async (req, res) => {
-    
+
     try {
         const { ObjectId } = require('mongodb');
         const { updates } = req.body; // Array of {id, quantity} objects
-        
-        
+
+
         if (!updates) {
             console.error('❌ No updates provided in request body');
             return res.status(400).json({ error: "Updates field is required" });
         }
-        
+
         if (!Array.isArray(updates)) {
             console.error('❌ Updates is not an array:', updates);
             return res.status(400).json({ error: "Updates must be an array" });
         }
-        
-        
+
+
         const database = client.db(databaseName);
         const collection = database.collection("Products");
-        
+
         // Process each update
         const results = [];
         for (let i = 0; i < updates.length; i++) {
             const update = updates[i];
-            
+
             // Validate the update object
             if (!update.id || typeof update.quantity !== 'number') {
                 console.error('❌ Invalid update object:', update);
                 return res.status(400).json({ error: "Each update must have id and quantity" });
             }
-            
+
             // Check if the product exists first
             const existingProduct = await collection.findOne({ _id: new ObjectId(update.id) });
             if (!existingProduct) {
                 console.error(`❌ Product not found: ${update.id}`);
                 return res.status(404).json({ error: `Product not found: ${update.id}` });
             }
-            
-            
+
+
             // Check if there's enough stock
             if (existingProduct.stockQuantity < update.quantity) {
                 console.error(`❌ Insufficient stock for ${existingProduct.name}. Available: ${existingProduct.stockQuantity}, Requested: ${update.quantity}`);
-                return res.status(400).json({ 
-                    error: `Insufficient stock for ${existingProduct.name}. Available: ${existingProduct.stockQuantity}, Requested: ${update.quantity}` 
+                return res.status(400).json({
+                    error: `Insufficient stock for ${existingProduct.name}. Available: ${existingProduct.stockQuantity}, Requested: ${update.quantity}`
                 });
             }
-            
+
             // Update the stock
             const result = await collection.updateOne(
                 { _id: new ObjectId(update.id) },
                 { $inc: { stockQuantity: -update.quantity } }
             );
-            
+
             results.push(result);
         }
-        
+
         res.json({ success: true, message: "Stock updated successfully", results });
     } catch (error) {
         console.error("❌ Error updating bulk stock:", error);
@@ -379,19 +379,19 @@ app.put('/api/products/:id', async (req, res) => {
     try {
         const { ObjectId } = require('mongodb');
         const updateData = req.body;
-        
+
         const database = client.db(databaseName);
         const collection = database.collection("Products");
-        
+
         const result = await collection.updateOne(
             { _id: new ObjectId(req.params.id) },
             { $set: updateData }
         );
-        
+
         if (result.matchedCount === 0) {
             return res.status(404).json({ error: "Product not found" });
         }
-        
+
         res.json({ success: true, message: "Product updated successfully" });
     } catch (error) {
         console.error("Error updating product:", error);
@@ -404,23 +404,23 @@ app.put('/api/products/:id/stock', async (req, res) => {
     try {
         const { ObjectId } = require('mongodb');
         const { quantity } = req.body;
-        
+
         if (typeof quantity !== 'number' || quantity < 0) {
             return res.status(400).json({ error: "Invalid quantity" });
         }
-        
+
         const database = client.db(databaseName);
         const collection = database.collection("Products");
-        
+
         const result = await collection.updateOne(
             { _id: new ObjectId(req.params.id) },
             { $set: { stockQuantity: quantity } }
         );
-        
+
         if (result.matchedCount === 0) {
             return res.status(404).json({ error: "Product not found" });
         }
-        
+
         res.json({ success: true, message: "Stock updated successfully" });
     } catch (error) {
         console.error("Error updating stock:", error);
@@ -433,25 +433,25 @@ app.post('/api/products/validate-stock', async (req, res) => {
     try {
         const { ObjectId } = require('mongodb');
         const { items } = req.body; // Array of {id, quantity} objects
-        
-        
+
+
         if (!items || !Array.isArray(items)) {
             return res.status(400).json({ error: "Items array is required" });
         }
-        
+
         const database = client.db(databaseName);
         const collection = database.collection("Products");
-        
+
         const validationResults = [];
         let allValid = true;
-        
+
         for (const item of items) {
             if (!item.id || typeof item.quantity !== 'number') {
                 return res.status(400).json({ error: "Each item must have id and quantity" });
             }
-            
+
             const product = await collection.findOne({ _id: new ObjectId(item.id) });
-            
+
             if (!product) {
                 validationResults.push({
                     id: item.id,
@@ -464,10 +464,10 @@ app.post('/api/products/validate-stock', async (req, res) => {
                 allValid = false;
                 continue;
             }
-            
+
             const isValid = product.stockQuantity >= item.quantity;
             if (!isValid) allValid = false;
-            
+
             validationResults.push({
                 id: item.id,
                 name: product.name,
@@ -477,14 +477,14 @@ app.post('/api/products/validate-stock', async (req, res) => {
                 error: isValid ? null : 'Insufficient stock'
             });
         }
-        
-        
+
+
         res.json({
             success: true,
             allValid: allValid,
             items: validationResults
         });
-        
+
     } catch (error) {
         console.error("❌ Error validating stock:", error);
         res.status(500).json({ error: "Failed to validate stock" });
@@ -496,18 +496,18 @@ app.post('/api/products/reserve-stock', async (req, res) => {
     try {
         const { ObjectId } = require('mongodb');
         const { items, reservationId, expiresInMinutes = 15 } = req.body;
-        
-        
+
+
         if (!items || !Array.isArray(items) || !reservationId) {
             return res.status(400).json({ error: "Items array and reservationId are required" });
         }
-        
+
         const database = client.db(databaseName);
         const collection = database.collection("Products");
         const reservationsCollection = database.collection("StockReservations");
-        
+
         const expiresAt = new Date(Date.now() + (expiresInMinutes * 60 * 1000));
-        
+
         // Create reservation record
         const reservation = {
             reservationId: reservationId,
@@ -516,17 +516,17 @@ app.post('/api/products/reserve-stock', async (req, res) => {
             expiresAt: expiresAt,
             status: 'active'
         };
-        
+
         await reservationsCollection.insertOne(reservation);
-        
-        
+
+
         res.json({
             success: true,
             reservationId: reservationId,
             expiresAt: expiresAt,
             message: `Stock reserved for ${expiresInMinutes} minutes`
         });
-        
+
     } catch (error) {
         console.error("❌ Error reserving stock:", error);
         res.status(500).json({ error: "Failed to reserve stock" });
@@ -538,35 +538,35 @@ app.post('/api/products/restore-stock', async (req, res) => {
     try {
         const { ObjectId } = require('mongodb');
         const { items, reason = 'Order cancelled' } = req.body;
-        
-        
+
+
         if (!items || !Array.isArray(items)) {
             return res.status(400).json({ error: "Items array is required" });
         }
-        
+
         const database = client.db(databaseName);
         const collection = database.collection("Products");
-        
+
         const results = [];
-        
+
         for (const item of items) {
             if (!item.id || typeof item.quantity !== 'number') {
                 return res.status(400).json({ error: "Each item must have id and quantity" });
             }
-            
+
             const product = await collection.findOne({ _id: new ObjectId(item.id) });
-            
+
             if (!product) {
                 console.error(`❌ Product not found for restoration: ${item.id}`);
                 continue;
             }
-            
+
             // Restore stock by adding the quantity back
             const result = await collection.updateOne(
                 { _id: new ObjectId(item.id) },
                 { $inc: { stockQuantity: item.quantity } }
             );
-            
+
             results.push({
                 productId: item.id,
                 productName: product.name,
@@ -574,15 +574,15 @@ app.post('/api/products/restore-stock', async (req, res) => {
                 newStock: product.stockQuantity + item.quantity
             });
         }
-        
-        
+
+
         res.json({
             success: true,
             message: `Stock restored for ${results.length} products`,
             reason: reason,
             results: results
         });
-        
+
     } catch (error) {
         console.error("❌ Error restoring stock:", error);
         res.status(500).json({ error: "Failed to restore stock" });
@@ -594,32 +594,32 @@ app.post('/api/products/stock-levels', async (req, res) => {
     try {
         const { ObjectId } = require('mongodb');
         const { productIds } = req.body;
-        
+
         if (!productIds || !Array.isArray(productIds)) {
             return res.status(400).json({ error: "Product IDs array is required" });
         }
-        
+
         const database = client.db(databaseName);
         const collection = database.collection("Products");
-        
+
         const objectIds = productIds.map(id => new ObjectId(id));
         const products = await collection.find(
             { _id: { $in: objectIds } },
             { projection: { _id: 1, name: 1, stockQuantity: 1, isActive: 1 } }
         ).toArray();
-        
+
         const stockLevels = products.map(product => ({
             id: product._id.toString(),
             name: product.name,
             stockQuantity: product.stockQuantity,
             isActive: product.isActive
         }));
-        
+
         res.json({
             success: true,
             stockLevels: stockLevels
         });
-        
+
     } catch (error) {
         console.error("Error fetching stock levels:", error);
         res.status(500).json({ error: "Failed to fetch stock levels" });
@@ -635,7 +635,7 @@ app.get('/api/debug/test', (req, res) => {
 app.post('/api/orders', async (req, res) => {
     try {
         console.log('Request body keys:', Object.keys(req.body));
-        
+
         // Handle both old format (userId, order) and new format (direct order data)
         let orderData;
         if (req.body.userId && req.body.order) {
@@ -645,19 +645,19 @@ app.post('/api/orders', async (req, res) => {
             // New format from checkout
             orderData = req.body;
         }
-        
-        
+
+
         if (!orderData.userId) {
             return res.status(400).json({ error: "Missing userId" });
         }
-        
+
         if (!orderData.cartItems || !Array.isArray(orderData.cartItems)) {
             return res.status(400).json({ error: "Missing or invalid cartItems" });
         }
-        
+
         const database = client.db(databaseName);
         const collection = database.collection("PendingOrders");
-        
+
         // Normalize category bucket for each cart item
         const normalizeCategory = (raw) => {
             const val = String(raw || '').toLowerCase();
@@ -687,12 +687,12 @@ app.post('/api/orders', async (req, res) => {
         const formattedOrder = {
             userId: orderData.userId,
             orderNumber: orderData.orderNumber || `ORD-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-            
+
             // Customer Information
             fullName: orderData.fullName || '',
             email: orderData.email || '',
             phoneNumber: orderData.phoneNumber || '',
-            
+
             // Order Items
             itemsordered: orderData.cartItems.map(item => ({
                 item_name: item.name || 'Unknown Item',
@@ -704,10 +704,10 @@ app.post('/api/orders', async (req, res) => {
                 category_bucket: item.categoryBucket || normalizeCategory(item.category),
                 category_original: item.categoryOriginal || item.category || 'unknown'
             })),
-            
+
             // Address Information
             address: orderData.address || '',
-            
+
             // Payment Information
             paymentMethod: orderData.paymentMethod || '',
             paymentType: orderData.paymentType || null, // Full payment or Split payment
@@ -716,38 +716,38 @@ app.post('/api/orders', async (req, res) => {
             paymentAmount: parseFloat(orderData.paymentAmount) || 0,
             changeUponDelivery: orderData.changeUponDelivery || false, // Toggle for change upon delivery
             proofOfPayment: orderData.proofOfPayment || null,
-            
+
             // Order Details
             subtotal: parseFloat(orderData.subtotal) || 0, // Subtotal before delivery fee
             deliveryFee: parseFloat(orderData.deliveryFee) || 0, // Delivery fee amount
             total: parseFloat(orderData.total) || 0,
             notes: orderData.notes || 'no additional notes',
             status: orderData.status || 'active',
-            
+
             // Dates
             orderDate: orderData.orderDate || new Date(),
             createdAt: new Date(),
             updatedAt: new Date(),
-            
+
             // Additional metadata
             source: 'checkout_page'
         };
-        
+
         console.log('Order number:', formattedOrder.orderNumber);
         console.log('Customer:', formattedOrder.fullName);
         console.log('Status:', formattedOrder.status);
         console.log('Items count:', formattedOrder.itemsordered.length);
-        
+
         const result = await collection.insertOne(formattedOrder);
-        
-        
-        res.json({ 
-            success: true, 
-            message: "Order saved successfully", 
+
+
+        res.json({
+            success: true,
+            message: "Order saved successfully",
             orderId: result.insertedId,
             orderNumber: formattedOrder.orderNumber
         });
-        
+
     } catch (error) {
         console.error("❌ Error saving order:", error);
         console.error("Error details:", error.message);
@@ -759,25 +759,25 @@ app.post('/api/orders', async (req, res) => {
 app.get('/api/orders/pending', async (req, res) => {
     try {
         await client.db("admin").command({ ping: 1 });
-        
+
         const database = client.db(databaseName);
         const collection = database.collection("PendingOrders");
-        
+
         const totalCount = await collection.countDocuments({});
-        
-        
+
+
         // First, let's see what statuses actually exist
         const allStatuses = await collection.distinct("status");
-        
+
         // Check for both "Pending" and "pending" (case sensitive issue?)
         const pendingUpperCase = await collection.find({ status: "Pending" }).toArray();
         const pendingLowerCase = await collection.find({ status: "pending" }).toArray();
-        
-        
+
+
         // Return orders with status "Pending" or "active" - include new active orders
         const pendingOrders = await collection.aggregate([
-            { 
-                $match: { 
+            {
+                $match: {
                     $or: [
                         { status: "Pending" },
                         { status: "pending" },
@@ -787,7 +787,7 @@ app.get('/api/orders/pending', async (req, res) => {
             },
             { $sort: { createdAt: -1 } }
         ], { allowDiskUse: true }).toArray();
-        
+
         // Map the orders to the required format
         const formattedOrders = pendingOrders.map(order => ({
             id: order._id,
@@ -795,7 +795,7 @@ app.get('/api/orders/pending', async (req, res) => {
             status: order.status,
             total: order.total
         }));
-        
+
         res.json(formattedOrders);
     } catch (error) {
         console.error("❌ Error fetching pending orders:", error);
@@ -808,40 +808,40 @@ app.get('/api/orders/pending', async (req, res) => {
 // API endpoint to get comprehensive staff statistics from all collections including walk-ins
 app.get('/api/orders/stats/staff-overview', async (req, res) => {
     try {
-        
+
         const database = client.db(databaseName);
-        
+
         // Get counts from all collections
         const pendingCollection = database.collection("PendingOrders");
         const acceptedCollection = database.collection("AcceptedOrders");
         const deliveredCollection = database.collection("DeliveredOrders");
-        
+
         // Count all orders in each collection
         const totalPending = await pendingCollection.countDocuments({});
         const totalAccepted = await acceptedCollection.countDocuments({});
         const totalDelivered = await deliveredCollection.countDocuments({});
-        
-        
+
+
         // Calculate total revenue from both accepted and delivered orders
         const acceptedOrders = await acceptedCollection.find({}).toArray();
         const deliveredOrders = await deliveredCollection.find({}).toArray();
-        
+
         const totalRevenue = [
             ...acceptedOrders,
             ...deliveredOrders
         ].reduce((sum, order) => {
             return sum + (parseFloat(order.total) || 0);
         }, 0);
-        
+
         const stats = {
             totalPending,
-            totalAccepted, 
+            totalAccepted,
             totalDelivered,
             totalRevenue,
             totalOrders: totalPending + totalAccepted + totalDelivered
         };
-        
-        
+
+
         res.json(stats);
     } catch (error) {
         console.error("Error fetching staff comprehensive statistics:", error);
@@ -853,17 +853,17 @@ app.get('/api/orders/stats/staff-overview', async (req, res) => {
 app.get('/api/orders/stats/:userId', async (req, res) => {
     try {
         const userId = req.params.userId;
-        
+
         // Get email and fullName from query parameters if provided
         const { email, fullName } = req.query;
-        
+
         // Handle both string and number userIds
         const userIdAsString = String(userId);
         const userIdAsNumber = isNaN(userId) ? null : Number(userId);
-        
+
         // Build query that matches by userId, email, or fullName
         const queryConditions = [];
-        
+
         // Add userId conditions only if userId is not 'by-email' and is a valid identifier
         if (userId !== 'by-email') {
             if (userIdAsNumber !== null) {
@@ -872,28 +872,28 @@ app.get('/api/orders/stats/:userId', async (req, res) => {
                 queryConditions.push({ userId: userIdAsString });
             }
         }
-        
+
         // Add email condition if provided
         if (email) {
             queryConditions.push({ email: email });
         }
-        
+
         // Add fullName condition if provided
         if (fullName) {
             queryConditions.push({ fullName: fullName });
         }
-        
+
         // Create query with $or to match any condition, or use single condition if only one
         const userQuery = queryConditions.length > 1 ? { $or: queryConditions } : (queryConditions.length === 1 ? queryConditions[0] : {});
-        
+
         const database = client.db(databaseName);
-        
+
         // Count orders in each collection
         const pendingCount = await database.collection("PendingOrders").countDocuments(userQuery);
         const acceptedCount = await database.collection("AcceptedOrders").countDocuments(userQuery);
         const deliveredCount = await database.collection("DeliveredOrders").countDocuments(userQuery);
         const walkInCount = await database.collection("WalkInOrders").countDocuments(userQuery);
-        
+
         const cancellationQueryConditions = [];
         if (userId !== 'by-email') {
             if (userIdAsNumber !== null) {
@@ -923,7 +923,7 @@ app.get('/api/orders/stats/:userId', async (req, res) => {
             : (cancellationQueryConditions.length === 1 ? cancellationQueryConditions[0] : {});
 
         const cancellationCount = await database.collection("CancellationRequests").countDocuments(cancellationQuery);
-        
+
         // Calculate total spent across all collections
         const collections = [
             { name: "PendingOrders", collection: database.collection("PendingOrders") },
@@ -931,7 +931,7 @@ app.get('/api/orders/stats/:userId', async (req, res) => {
             { name: "DeliveredOrders", collection: database.collection("DeliveredOrders") },
             { name: "WalkInOrders", collection: database.collection("WalkInOrders") }
         ];
-        
+
         let totalSpent = 0;
         for (const { collection } of collections) {
             const orders = await collection.find(userQuery).toArray();
@@ -939,7 +939,7 @@ app.get('/api/orders/stats/:userId', async (req, res) => {
                 totalSpent += parseFloat(order.total) || 0;
             }
         }
-        
+
         res.json({
             totalOrders: pendingCount + acceptedCount + deliveredCount + walkInCount + cancellationCount,
             pendingOrders: pendingCount,
@@ -959,17 +959,17 @@ app.get('/api/orders/stats/:userId', async (req, res) => {
 app.get('/api/orders/all-staff', async (req, res) => {
     try {
         console.log('🎯 HIT: /api/orders/all-staff endpoint - this is the correct route!');
-        
+
         const minimal = req.query.minimal === 'true';
         const limit = req.query.limit ? parseInt(req.query.limit, 10) : null;
-        
+
         const database = client.db(databaseName);
         const pendingCollection = database.collection("PendingOrders");
         const acceptedCollection = database.collection("AcceptedOrders");
         const deliveredCollection = database.collection("DeliveredOrders");
         const walkInCollection = database.collection("WalkInOrders");
         const returnedCollection = database.collection("ReturnedOrders");
-        
+
         const minimalProjection = {
             _id: 1,
             orderNumber: 1,
@@ -1013,7 +1013,7 @@ app.get('/api/orders/all-staff', async (req, res) => {
                 ]
             }
         };
-        
+
         const buildPipeline = () => {
             const pipeline = [{ $match: {} }];
             if (minimal) {
@@ -1025,9 +1025,9 @@ app.get('/api/orders/all-staff', async (req, res) => {
             }
             return pipeline;
         };
-        
+
         const pipeline = buildPipeline();
-        
+
         // Fetch orders from collections (including returned orders)
         const [pendingOrders, acceptedOrders, deliveredOrders, walkInOrders, returnedOrders] = await Promise.all([
             pendingCollection.aggregate(pipeline, { allowDiskUse: true }).toArray(),
@@ -1036,14 +1036,14 @@ app.get('/api/orders/all-staff', async (req, res) => {
             walkInCollection.aggregate(pipeline, { allowDiskUse: true }).toArray(),
             returnedCollection.aggregate(pipeline, { allowDiskUse: true }).toArray()
         ]);
-        
+
         const enhanceOrder = (order, collection, displayStatus) => {
             const base = {
                 ...order,
                 collection,
                 displayStatus
             };
-            
+
             if (minimal) {
                 return {
                     ...base,
@@ -1051,10 +1051,10 @@ app.get('/api/orders/all-staff', async (req, res) => {
                     proofOfPayment: undefined
                 };
             }
-            
+
             return base;
         };
-        
+
         // Add collection info to each order for identification
         const allOrders = [
             ...pendingOrders.map(order => enhanceOrder(order, 'pending', order.status === 'active' ? 'pending' : order.status)),
@@ -1105,12 +1105,12 @@ app.get('/api/orders/all-staff', async (req, res) => {
                 return enhanced;
             })
         ];
-        
+
         // Sort all orders by creation date (newest first)
         allOrders.sort((a, b) => new Date(b.createdAt || b.orderDate || b.returnedAt) - new Date(a.createdAt || a.orderDate || a.returnedAt));
-        
+
         res.json(allOrders);
-        
+
     } catch (error) {
         console.error("❌ Error fetching all orders for staff:", error);
         res.status(500).json({ error: "Failed to fetch all orders for staff dashboard" });
@@ -1122,7 +1122,7 @@ app.get('/api/orders/details/:orderId', async (req, res) => {
     try {
         const { orderId } = req.params;
         const database = client.db(databaseName);
-        
+
         const collections = [
             { name: 'pending', displayStatus: 'pending', collection: database.collection("PendingOrders") },
             { name: 'accepted', displayStatus: 'approved', collection: database.collection("AcceptedOrders") },
@@ -1130,9 +1130,9 @@ app.get('/api/orders/details/:orderId', async (req, res) => {
             { name: 'walkin', displayStatus: 'completed', collection: database.collection("WalkInOrders") },
             { name: 'returned', displayStatus: 'returned', collection: database.collection("ReturnedOrders") }
         ];
-        
+
         let detailedOrder = null;
-        
+
         for (const { name, displayStatus, collection } of collections) {
             let found = null;
             try {
@@ -1140,7 +1140,7 @@ app.get('/api/orders/details/:orderId', async (req, res) => {
             } catch (error) {
                 // Ignore ObjectId errors and try next collection
             }
-            
+
             if (found) {
                 detailedOrder = {
                     ...found,
@@ -1150,11 +1150,11 @@ app.get('/api/orders/details/:orderId', async (req, res) => {
                 break;
             }
         }
-        
+
         if (!detailedOrder) {
             return res.status(404).json({ error: "Order not found" });
         }
-        
+
         res.json(detailedOrder);
     } catch (error) {
         console.error("❌ Error fetching order details:", error);
@@ -1193,33 +1193,33 @@ app.get('/api/orders/return-requests', async (req, res) => {
 app.get('/api/orders/:userId', async (req, res) => {
     try {
         const userId = req.params.userId;
-        
+
         // Add special check for all-staff
         if (userId === 'all-staff') {
             console.log('❌ ERROR: all-staff request is hitting the wrong route! This should go to /api/orders/all-staff');
-            return res.status(400).json({ 
-                error: "This endpoint is for specific user orders. Use /api/orders/all-staff for staff dashboard orders." 
+            return res.status(400).json({
+                error: "This endpoint is for specific user orders. Use /api/orders/all-staff for staff dashboard orders."
             });
         }
-        
+
         // Get email and fullName from query parameters if provided
         const { email, fullName } = req.query;
-        
+
         // Handle both string and number userIds
         const userIdAsString = String(userId);
         const userIdAsNumber = isNaN(userId) ? null : Number(userId);
-        
+
         const database = client.db(databaseName);
-        
+
         // Fetch from all order collections
         const pendingCollection = database.collection("PendingOrders");
         const acceptedCollection = database.collection("AcceptedOrders");
         const deliveredCollection = database.collection("DeliveredOrders");
         const walkInCollection = database.collection("WalkInOrders");
-        
+
         // Build query that matches by userId, email, or fullName
         const queryConditions = [];
-        
+
         // Add userId conditions only if userId is not 'by-email' and is a valid identifier
         if (userId !== 'by-email') {
             if (userIdAsNumber !== null) {
@@ -1228,46 +1228,46 @@ app.get('/api/orders/:userId', async (req, res) => {
                 queryConditions.push({ userId: userIdAsString });
             }
         }
-        
+
         // Add email condition if provided
         if (email) {
             queryConditions.push({ email: email });
         }
-        
+
         // Add fullName condition if provided
         if (fullName) {
             queryConditions.push({ fullName: fullName });
         }
-        
+
         // Create query with $or to match any condition, or use single condition if only one
         const userQuery = queryConditions.length > 1 ? { $or: queryConditions } : (queryConditions.length === 1 ? queryConditions[0] : {});
-        
+
         // Get orders from each collection
         const pendingOrders = await pendingCollection.aggregate([
             { $match: userQuery },
             { $sort: { createdAt: -1 } }
         ], { allowDiskUse: true }).toArray();
-        
+
         const acceptedOrders = await acceptedCollection.aggregate([
             { $match: userQuery },
             { $sort: { createdAt: -1 } }
         ], { allowDiskUse: true }).toArray();
-            
+
         const deliveredOrders = await deliveredCollection.aggregate([
             { $match: userQuery },
             { $sort: { createdAt: -1 } }
         ], { allowDiskUse: true }).toArray();
-        
+
         const walkInOrders = await walkInCollection.aggregate([
             { $match: userQuery },
             { $sort: { createdAt: -1 } }
         ], { allowDiskUse: true }).toArray();
-        
-        
+
+
         // Debug: Show what userIds exist in the pending collection
         const allPendingOrders = await pendingCollection.find({}).toArray();
         const existingUserIds = [...new Set(allPendingOrders.map(order => order.userId))];
-        
+
         // Add status to each order based on collection
         const pendingWithStatus = pendingOrders.map(order => ({
             ...order,
@@ -1379,12 +1379,12 @@ app.get('/api/orders/:userId', async (req, res) => {
 
         // Combine all orders
         const allOrders = [...pendingWithStatus, ...acceptedWithStatus, ...deliveredWithStatus, ...walkInWithStatus, ...cancellationWithStatus];
-        
+
         // Debug logging to help trace 500s
         try {
             console.log('[User Orders] totals => pending:', pendingOrders.length, 'accepted:', acceptedOrders.length, 'delivered:', deliveredOrders.length, 'walkin:', walkInOrders.length, 'cancellations:', cancellationRequests.length);
         } catch (e) {}
-        
+
         // Convert to the format expected by the frontend
         let formattedOrders = [];
         try {
@@ -1411,7 +1411,7 @@ app.get('/api/orders/:userId', async (req, res) => {
                     paymentAmount: order && order.paymentAmount,
                     changeUponDelivery: order && order.changeUponDelivery,
                     proofOfPayment: order && order.proofOfPayment,
-                    shipping: { 
+                    shipping: {
                         address: safeAddress,
                         phoneNumber: safeShippingPhone
                     },
@@ -1435,7 +1435,7 @@ app.get('/api/orders/:userId', async (req, res) => {
             // Fallback to empty array on mapping error to avoid 500
             formattedOrders = [];
         }
-         
+
         // Sort by date (newest first)
         try {
             formattedOrders.sort((a, b) => {
@@ -1444,7 +1444,7 @@ app.get('/api/orders/:userId', async (req, res) => {
                 return db - da;
             });
         } catch (e) {}
-         
+
         res.json(formattedOrders);
     } catch (error) {
         console.error("Error fetching user orders:", error);
@@ -1457,19 +1457,19 @@ app.put('/api/orders/:orderId/payment', async (req, res) => {
     try {
         const { ObjectId } = require('mongodb');
         const { paymentUpdates } = req.body;
-        
+
         const database = client.db(databaseName);
         const collection = database.collection("PendingOrders");
-        
+
         const result = await collection.updateOne(
             { _id: new ObjectId(req.params.orderId) },
             { $set: { payment: paymentUpdates } }
         );
-        
+
         if (result.matchedCount === 0) {
             return res.status(404).json({ error: "Order not found" });
         }
-        
+
         res.json({ success: true, message: "Payment details updated successfully" });
     } catch (error) {
         console.error("Error updating order payment:", error);
@@ -1482,15 +1482,15 @@ app.get('/api/orders', async (req, res) => {
     try {
         const database = client.db(databaseName);
         const collection = database.collection("PendingOrders");
-        
+
         const allOrders = await collection.aggregate([
             { $match: {} },
             { $sort: { createdAt: -1 } }
         ], { allowDiskUse: true }).toArray();
-        
+
         if (allOrders.length > 0) {
         }
-        
+
         res.json(allOrders);
     } catch (error) {
         console.error("Error fetching all orders:", error);
@@ -1503,23 +1503,23 @@ app.put('/api/orders/:orderId/status', async (req, res) => {
     try {
         const { ObjectId } = require('mongodb');
         const { status } = req.body;
-        
+
         if (!status) {
             return res.status(400).json({ error: "Status is required" });
         }
-        
+
         const database = client.db(databaseName);
         const collection = database.collection("PendingOrders");
-        
+
         const result = await collection.updateOne(
             { _id: new ObjectId(req.params.orderId) },
             { $set: { status: status } }
         );
-        
+
         if (result.matchedCount === 0) {
             return res.status(404).json({ error: "Order not found" });
         }
-        
+
         res.json({ success: true, message: `Order status updated to ${status}` });
     } catch (error) {
         console.error("Error updating order status:", error);
@@ -1530,22 +1530,22 @@ app.put('/api/orders/:orderId/status', async (req, res) => {
 // API endpoint to get orders with proof of payment (for staff review)
 app.get('/api/orders/with-proof', async (req, res) => {
     try {
-        
+
         const database = client.db(databaseName);
         const collection = database.collection("PendingOrders");
-        
+
         // Find orders that have proofOfPayment field and it's not null/empty
         const ordersWithProof = await collection.aggregate([
-            { 
-                $match: { 
+            {
+                $match: {
                     proofOfPayment: { $exists: true, $ne: null, $ne: "" },
                     status: { $in: ["active", "Pending", "pending"] }
                 }
             },
             { $sort: { createdAt: -1 } }
         ], { allowDiskUse: true }).toArray();
-        
-        
+
+
         // Format orders for staff review
         const formattedOrders = ordersWithProof.map(order => ({
             _id: order._id,
@@ -1565,7 +1565,7 @@ app.get('/api/orders/with-proof', async (req, res) => {
             createdAt: order.createdAt,
             itemsordered: order.itemsordered
         }));
-        
+
         res.json(formattedOrders);
     } catch (error) {
         console.error("❌ Error fetching orders with proof:", error);
@@ -1578,10 +1578,10 @@ app.put('/api/orders/:orderId/verify-payment', async (req, res) => {
     try {
         const { ObjectId } = require('mongodb');
         const { verified, verifiedBy, verificationNotes } = req.body;
-        
+
         const database = client.db(databaseName);
         const collection = database.collection("PendingOrders");
-        
+
         const updateData = {
             paymentVerified: verified,
             paymentVerifiedBy: verifiedBy,
@@ -1589,24 +1589,24 @@ app.put('/api/orders/:orderId/verify-payment', async (req, res) => {
             paymentVerificationDate: new Date(),
             updatedAt: new Date()
         };
-        
+
         // If payment is verified, update status to "confirmed"
         if (verified) {
             updateData.status = "confirmed";
         }
-        
+
         const result = await collection.updateOne(
             { _id: new ObjectId(req.params.orderId) },
             { $set: updateData }
         );
-        
+
         if (result.matchedCount === 0) {
             return res.status(404).json({ error: "Order not found" });
         }
-        
-        res.json({ 
-            success: true, 
-            message: `Payment ${verified ? 'verified' : 'rejected'} successfully` 
+
+        res.json({
+            success: true,
+            message: `Payment ${verified ? 'verified' : 'rejected'} successfully`
         });
     } catch (error) {
         console.error("Error updating payment verification:", error);
@@ -1618,21 +1618,21 @@ app.put('/api/orders/:orderId/verify-payment', async (req, res) => {
 app.post('/api/orders/migrate', async (req, res) => {
     try {
         const { userCarts } = req.body;
-        
+
         if (!userCarts || typeof userCarts !== 'object') {
             return res.status(400).json({ error: "Invalid userCarts data" });
         }
-        
+
         const database = client.db(databaseName);
         const collection = database.collection("PendingOrders");
-        
+
         let totalMigrated = 0;
         let errors = [];
-        
+
         // Process each user's orders
         for (const [userId, orders] of Object.entries(userCarts)) {
             if (!Array.isArray(orders)) continue;
-            
+
             for (const order of orders) {
                 try {
                     // Check if order already exists (avoid duplicates)
@@ -1641,12 +1641,12 @@ app.post('/api/orders/migrate', async (req, res) => {
                         original_date: order.date,
                         "itemsordered.item_name": (order.items && order.items[0] && order.items[0].name) || ''
                     });
-                    
+
                     if (existingOrder) {
                         console.log(`Order already exists for user ${userId}, skipping`);
                         continue;
                     }
-                    
+
                     // Format the order according to MongoDB structure
                     const formattedOrder = {
                         userId: userId,
@@ -1673,24 +1673,24 @@ app.post('/api/orders/migrate', async (req, res) => {
                         createdAt: new Date(order.date),
                         migrated: true
                     };
-                    
+
                     await collection.insertOne(formattedOrder);
                     totalMigrated++;
-                    
+
                 } catch (orderError) {
                     console.error(`Error migrating order for user ${userId}:`, orderError);
                     errors.push(`User ${userId}: ${orderError.message}`);
                 }
             }
         }
-        
-        res.json({ 
-            success: true, 
+
+        res.json({
+            success: true,
             message: `Successfully migrated ${totalMigrated} orders`,
             totalMigrated,
             errors: errors.length > 0 ? errors : undefined
         });
-        
+
     } catch (error) {
         console.error("Error migrating orders:", error);
         res.status(500).json({ error: "Failed to migrate orders" });
@@ -1701,49 +1701,49 @@ app.post('/api/orders/migrate', async (req, res) => {
 app.post('/api/staff/login', async (req, res) => {
     try {
         const { username, password } = req.body;
-        
+
         // Input validation and sanitization
         if (!username || !password) {
-            return res.status(400).json({ 
-                success: false, 
-                message: "Username and password are required" 
+            return res.status(400).json({
+                success: false,
+                message: "Username and password are required"
             });
         }
-        
+
         // Sanitize inputs
         const sanitizedUsername = String(username).trim().toLowerCase();
         const sanitizedPassword = String(password).trim();
-        
+
         // Validate input length and format
         if (sanitizedUsername.length < 3 || sanitizedUsername.length > 50) {
-            return res.status(400).json({ 
-                success: false, 
-                message: "Invalid username format" 
+            return res.status(400).json({
+                success: false,
+                message: "Invalid username format"
             });
         }
-        
+
         if (sanitizedPassword.length < 6 || sanitizedPassword.length > 128) {
-            return res.status(400).json({ 
-                success: false, 
-                message: "Invalid password format" 
+            return res.status(400).json({
+                success: false,
+                message: "Invalid password format"
             });
         }
-        
+
         const database = client.db(databaseName);
         const collection = database.collection("AdminUsers");
-        
+
         // Find user with matching username
-        const staffUser = await collection.findOne({ 
+        const staffUser = await collection.findOne({
             username: sanitizedUsername
         });
-        
+
         if (!staffUser) {
-            return res.status(401).json({ 
-                success: false, 
-                message: "Invalid credentials" 
+            return res.status(401).json({
+                success: false,
+                message: "Invalid credentials"
             });
         }
-        
+
         // Verify password using bcrypt (handle both 'password' and 'passwordHash' fields)
         const passwordField = staffUser.password || staffUser.passwordHash;
         if (!passwordField) {
@@ -1753,25 +1753,25 @@ app.post('/api/staff/login', async (req, res) => {
             });
         }
         const passwordMatch = await bcrypt.compare(sanitizedPassword, passwordField);
-        
+
         if (!passwordMatch) {
-            return res.status(401).json({ 
-                success: false, 
-                message: "Invalid credentials" 
+            return res.status(401).json({
+                success: false,
+                message: "Invalid credentials"
             });
         }
-        
+
         // Update last login time
         await collection.updateOne(
             { _id: staffUser._id },
-            { 
-                $set: { 
+            {
+                $set: {
                     lastLogin: new Date(),
                     lastUpdated: new Date()
                 }
             }
         );
-        
+
         // Return success with user info (excluding password)
         const { password: _, ...userInfo } = staffUser;
         res.json({
@@ -1779,12 +1779,12 @@ app.post('/api/staff/login', async (req, res) => {
             message: `Staff login successful for ${staffUser.username}`,
             user: userInfo
         });
-        
+
     } catch (error) {
         console.error("Error during staff login:", error);
-        res.status(500).json({ 
-            success: false, 
-            message: "Server error during login" 
+        res.status(500).json({
+            success: false,
+            message: "Server error during login"
         });
     }
 });
@@ -1793,16 +1793,16 @@ app.post('/api/staff/login', async (req, res) => {
 app.post('/api/user-addresses', async (req, res) => {
     try {
         const { userId, email, addressData } = req.body;
-        
+
         // Support both userId and email for address association
         if (!addressData) {
             return res.status(400).json({ success: false, error: 'Missing addressData' });
         }
-        
+
         if (!userId && !email) {
             return res.status(400).json({ success: false, error: 'Missing userId or email' });
         }
-        
+
         const database = client.db(databaseName);
         const collection = database.collection('UserAddresses');
 
@@ -1838,7 +1838,7 @@ app.post('/api/user-addresses', async (req, res) => {
             createdAt: new Date(),
             updatedAt: new Date()
         };
-        
+
         // Add userId and/or email to the document
         if (userId) {
             // Convert userId to number if possible
@@ -1851,13 +1851,13 @@ app.post('/api/user-addresses', async (req, res) => {
         if (email) {
             doc.email = email;
         }
-        
+
         console.log('📮 Document to save:', JSON.stringify(doc, null, 2));
-        
+
         const result = await collection.insertOne(doc);
         console.log('✅ Address saved successfully! Inserted ID:', result.insertedId);
         console.log(`📮 Database: ${databaseName}, Collection: UserAddresses`);
-        
+
         res.json({ success: true, message: 'Address saved successfully', addressId: result.insertedId });
     } catch (error) {
         console.error('Error saving user address:', error);
@@ -1869,15 +1869,15 @@ app.post('/api/user-addresses', async (req, res) => {
 app.get('/api/user-addresses', async (req, res) => {
     try {
         const { userId, email } = req.query;
-        
+
         // Support both userId and email for address lookup
         if (!userId && !email) {
             return res.status(400).json({ error: 'Missing userId or email' });
         }
-        
+
         const database = client.db(databaseName);
         const collection = database.collection('UserAddresses');
-        
+
         // Build query - support both userId and email
         const query = {};
         if (userId) {
@@ -1891,7 +1891,7 @@ app.get('/api/user-addresses', async (req, res) => {
         if (email) {
             query.email = email;
         }
-        
+
         const addresses = await collection.aggregate([
             { $match: query },
             { $sort: { createdAt: -1 } }
@@ -1909,12 +1909,12 @@ app.delete('/api/user-addresses/:id', async (req, res) => {
         const { id } = req.params;
         const database = client.db(databaseName);
         const collection = database.collection('UserAddresses');
-        
+
         console.log('🗑️ Deleting address with id:', id);
-        
+
         // Try to find address by id field first (custom id like "addr_...")
         let address = await collection.findOne({ id });
-        
+
         // If not found by id, try by _id (in case the id passed is actually a MongoDB ObjectId)
         if (!address && id.match(/^[0-9a-fA-F]{24}$/)) {
             try {
@@ -1923,19 +1923,19 @@ app.delete('/api/user-addresses/:id', async (req, res) => {
                 // Invalid ObjectId format, continue
             }
         }
-        
+
         if (!address) {
             console.log('❌ Address not found with id:', id);
             return res.status(404).json({ success: false, error: 'Address not found' });
         }
-        
+
         // Delete the address using _id (MongoDB's primary key)
         const result = await collection.deleteOne({ _id: address._id });
-        
+
         if (result.deletedCount === 0) {
             return res.status(404).json({ success: false, error: 'Address not found' });
         }
-        
+
         console.log('✅ Address deleted successfully:', id);
         res.json({ success: true, message: 'Address deleted successfully' });
     } catch (error) {
@@ -1950,10 +1950,10 @@ app.put('/api/user-addresses/:id/default', async (req, res) => {
         const { id } = req.params;
         const database = client.db(databaseName);
         const collection = database.collection('UserAddresses');
-        
+
         // Try to find address by id field first (custom id like "addr_...")
         let address = await collection.findOne({ id });
-        
+
         // If not found by id, try by _id (in case the id passed is actually a MongoDB ObjectId)
         if (!address && id.match(/^[0-9a-fA-F]{24}$/)) {
             try {
@@ -1962,7 +1962,7 @@ app.put('/api/user-addresses/:id/default', async (req, res) => {
                 // Invalid ObjectId format, continue
             }
         }
-        
+
         if (!address) {
             return res.status(404).json({ success: false, error: 'Address not found' });
         }
@@ -1994,16 +1994,16 @@ app.put('/api/user-addresses/:id/default', async (req, res) => {
 // API endpoint to add order to AcceptedOrders collection
 app.post('/api/orders/accepted', async (req, res) => {
     try {
-        
+
         const orderData = req.body;
-        
+
         if (!orderData) {
             return res.status(400).json({ error: "Order data is required" });
         }
-        
+
         const database = client.db(databaseName);
         const collection = database.collection("AcceptedOrders");
-        
+
         // Ensure the order has the correct status and approval metadata
         const acceptedOrder = {
             ...orderData,
@@ -2011,17 +2011,17 @@ app.post('/api/orders/accepted', async (req, res) => {
             approvedAt: new Date(),
             updatedAt: new Date()
         };
-        
+
         const result = await collection.insertOne(acceptedOrder);
-        
-        
-        res.json({ 
-            success: true, 
-            message: "Order moved to AcceptedOrders successfully", 
+
+
+        res.json({
+            success: true,
+            message: "Order moved to AcceptedOrders successfully",
             insertedId: result.insertedId,
             orderId: result.insertedId
         });
-        
+
     } catch (error) {
         console.error("❌ Error adding order to AcceptedOrders:", error);
         res.status(500).json({ error: "Failed to add order to AcceptedOrders" });
@@ -2033,18 +2033,18 @@ app.get('/api/orders/accepted/:orderId', async (req, res) => {
     try {
         const { ObjectId } = require('mongodb');
         const orderId = req.params.orderId;
-        
+
         const database = client.db(databaseName);
         const collection = database.collection("AcceptedOrders");
-        
+
         const order = await collection.findOne({ _id: new ObjectId(orderId) });
-        
+
         if (!order) {
             return res.status(404).json({ error: "Order not found in AcceptedOrders" });
         }
-        
+
         res.json(order);
-        
+
     } catch (error) {
         console.error("❌ Error fetching order from AcceptedOrders:", error);
         res.status(500).json({ error: "Failed to fetch order from AcceptedOrders" });
@@ -2056,24 +2056,24 @@ app.delete('/api/orders/pending/:orderId', async (req, res) => {
     try {
         const { ObjectId } = require('mongodb');
         const orderId = req.params.orderId;
-        
-        
+
+
         const database = client.db(databaseName);
         const collection = database.collection("PendingOrders");
-        
+
         const result = await collection.deleteOne({ _id: new ObjectId(orderId) });
-        
+
         if (result.deletedCount === 0) {
             return res.status(404).json({ error: "Order not found in PendingOrders" });
         }
-        
-        
-        res.json({ 
-            success: true, 
+
+
+        res.json({
+            success: true,
             message: "Order removed from PendingOrders successfully",
             deletedCount: result.deletedCount
         });
-        
+
     } catch (error) {
         console.error("❌ Error deleting order from PendingOrders:", error);
         res.status(500).json({ error: "Failed to delete order from PendingOrders" });
@@ -2083,16 +2083,16 @@ app.delete('/api/orders/pending/:orderId', async (req, res) => {
 // API endpoint to add order to DeliveredOrders collection
 app.post('/api/orders/delivered', async (req, res) => {
     try {
-        
+
         const orderData = req.body;
-        
+
         if (!orderData) {
             return res.status(400).json({ error: "Order data is required" });
         }
-        
+
         const database = client.db(databaseName);
         const collection = database.collection("DeliveredOrders");
-        
+
         // Ensure the order has the correct status and delivery metadata
         const deliveredOrder = {
             ...orderData,
@@ -2100,17 +2100,17 @@ app.post('/api/orders/delivered', async (req, res) => {
             deliveredAt: new Date(),
             updatedAt: new Date()
         };
-        
+
         const result = await collection.insertOne(deliveredOrder);
-        
-        
-        res.json({ 
-            success: true, 
-            message: "Order moved to DeliveredOrders successfully", 
+
+
+        res.json({
+            success: true,
+            message: "Order moved to DeliveredOrders successfully",
             insertedId: result.insertedId,
             orderId: result.insertedId
         });
-        
+
     } catch (error) {
         console.error("❌ Error adding order to DeliveredOrders:", error);
         res.status(500).json({ error: "Failed to add order to DeliveredOrders" });
@@ -2122,18 +2122,18 @@ app.get('/api/orders/delivered/:orderId', async (req, res) => {
     try {
         const { ObjectId } = require('mongodb');
         const orderId = req.params.orderId;
-        
+
         const database = client.db(databaseName);
         const collection = database.collection("DeliveredOrders");
-        
+
         const order = await collection.findOne({ _id: new ObjectId(orderId) });
-        
+
         if (!order) {
             return res.status(404).json({ error: "Order not found in DeliveredOrders" });
         }
-        
+
         res.json(order);
-        
+
     } catch (error) {
         console.error("❌ Error fetching order from DeliveredOrders:", error);
         res.status(500).json({ error: "Failed to fetch order from DeliveredOrders" });
@@ -2145,24 +2145,24 @@ app.delete('/api/orders/accepted/:orderId', async (req, res) => {
     try {
         const { ObjectId } = require('mongodb');
         const orderId = req.params.orderId;
-        
-        
+
+
         const database = client.db(databaseName);
         const collection = database.collection("AcceptedOrders");
-        
+
         const result = await collection.deleteOne({ _id: new ObjectId(orderId) });
-        
+
         if (result.deletedCount === 0) {
             return res.status(404).json({ error: "Order not found in AcceptedOrders" });
         }
-        
-        
-        res.json({ 
-            success: true, 
+
+
+        res.json({
+            success: true,
             message: "Order removed from AcceptedOrders successfully",
             deletedCount: result.deletedCount
         });
-        
+
     } catch (error) {
         console.error("❌ Error deleting order from AcceptedOrders:", error);
         res.status(500).json({ error: "Failed to delete order from AcceptedOrders" });
@@ -2172,21 +2172,21 @@ app.delete('/api/orders/accepted/:orderId', async (req, res) => {
 // API endpoint to save walk-in orders from POS
 app.post('/api/orders/walkin', async (req, res) => {
     try {
-        
+
         const orderData = req.body;
-        
+
         if (!orderData) {
             return res.status(400).json({ error: "Order data is required" });
         }
-        
+
         // Validate required fields
         if (!orderData.fullName || !orderData.itemsordered || !Array.isArray(orderData.itemsordered)) {
             return res.status(400).json({ error: "Missing required fields: fullName and itemsordered" });
         }
-        
+
         const database = client.db(databaseName);
         const collection = database.collection("WalkInOrders");
-        
+
         // Ensure walk-in order has proper structure and timestamps
         const walkInOrder = {
             ...orderData,
@@ -2199,17 +2199,17 @@ app.post('/api/orders/walkin', async (req, res) => {
             staffProcessed: true,
             posTimestamp: new Date()
         };
-        
+
         const result = await collection.insertOne(walkInOrder);
-        
-        
-        res.json({ 
-            success: true, 
-            message: "Walk-in order saved successfully", 
+
+
+        res.json({
+            success: true,
+            message: "Walk-in order saved successfully",
             insertedId: result.insertedId,
             orderId: result.insertedId
         });
-        
+
     } catch (error) {
         console.error("❌ Error saving walk-in order:", error);
         res.status(500).json({ error: "Failed to save walk-in order", details: error.message });
@@ -2219,18 +2219,18 @@ app.post('/api/orders/walkin', async (req, res) => {
 // API endpoint to get all walk-in orders
 app.get('/api/orders/walkin', async (req, res) => {
     try {
-        
+
         const database = client.db(databaseName);
         const collection = database.collection("WalkInOrders");
-        
+
         const walkInOrders = await collection.aggregate([
             { $match: {} },
             { $sort: { createdAt: -1 } }
         ], { allowDiskUse: true }).toArray();
-        
-        
+
+
         res.json(walkInOrders);
-        
+
     } catch (error) {
         console.error("❌ Error fetching walk-in orders:", error);
         res.status(500).json({ error: "Failed to fetch walk-in orders" });
@@ -2240,12 +2240,12 @@ app.get('/api/orders/walkin', async (req, res) => {
 // API endpoint to get walk-in orders stats
 app.get('/api/orders/walkin/stats', async (req, res) => {
     try {
-        
+
         const database = client.db(databaseName);
         const collection = database.collection("WalkInOrders");
-        
+
         const totalCount = await collection.countDocuments({});
-        
+
         // Get revenue from walk-in orders
         const revenueResult = await collection.aggregate([
             {
@@ -2256,16 +2256,16 @@ app.get('/api/orders/walkin/stats', async (req, res) => {
                 }
             }
         ]).toArray();
-        
+
         const stats = {
             totalWalkInOrders: totalCount,
             totalRevenue: revenueResult.length > 0 ? revenueResult[0].totalRevenue : 0,
             averageOrderValue: revenueResult.length > 0 ? revenueResult[0].avgOrderValue : 0
         };
-        
-        
+
+
         res.json(stats);
-        
+
     } catch (error) {
         console.error("❌ Error fetching walk-in order stats:", error);
         res.status(500).json({ error: "Failed to fetch walk-in order stats" });
@@ -2277,55 +2277,55 @@ app.get('/api/orders/walkin/stats', async (req, res) => {
 // API endpoint for comprehensive staff dashboard statistics
 app.get('/api/orders/stats/comprehensive', async (req, res) => {
     try {
-        
+
         const database = client.db(databaseName);
-        
+
         // Get counts from all order collections
         const pendingCollection = database.collection("PendingOrders");
         const acceptedCollection = database.collection("AcceptedOrders");
         const deliveredCollection = database.collection("DeliveredOrders");
         const walkInCollection = database.collection("WalkInOrders");
-        
+
         const [pendingCount, acceptedCount, deliveredCount, walkInCount] = await Promise.all([
             pendingCollection.countDocuments({}),
             acceptedCollection.countDocuments({}),
             deliveredCollection.countDocuments({}),
             walkInCollection.countDocuments({})
         ]);
-        
+
         // Calculate revenue from accepted and delivered orders
         const acceptedRevenue = await acceptedCollection.aggregate([
             { $group: { _id: null, total: { $sum: "$total" } } }
         ]).toArray();
-        
+
         const deliveredRevenue = await deliveredCollection.aggregate([
             { $group: { _id: null, total: { $sum: "$total" } } }
         ]).toArray();
-        
+
         const walkInRevenue = await walkInCollection.aggregate([
             { $group: { _id: null, total: { $sum: "$total" } } }
         ]).toArray();
-        
-        const totalRevenue = 
+
+        const totalRevenue =
             (acceptedRevenue.length > 0 ? acceptedRevenue[0].total : 0) +
             (deliveredRevenue.length > 0 ? deliveredRevenue[0].total : 0) +
             (walkInRevenue.length > 0 ? walkInRevenue[0].total : 0);
-        
+
         // Count total delivered products (items in delivered orders)
         const deliveredProductsResult = await deliveredCollection.aggregate([
             { $unwind: "$itemsordered" },
             { $group: { _id: null, totalProducts: { $sum: "$itemsordered.amount_per_item" } } }
         ]).toArray();
-        
+
         const walkInProductsResult = await walkInCollection.aggregate([
             { $unwind: "$itemsordered" },
             { $group: { _id: null, totalProducts: { $sum: "$itemsordered.amount_per_item" } } }
         ]).toArray();
-        
-        const totalDeliveredProducts = 
+
+        const totalDeliveredProducts =
             (deliveredProductsResult.length > 0 ? deliveredProductsResult[0].totalProducts : 0) +
             (walkInProductsResult.length > 0 ? walkInProductsResult[0].totalProducts : 0);
-        
+
         const stats = {
             totalPending: pendingCount,
             totalAccepted: acceptedCount,
@@ -2335,10 +2335,10 @@ app.get('/api/orders/stats/comprehensive', async (req, res) => {
             totalDeliveredProducts: totalDeliveredProducts,
             lastUpdated: new Date()
         };
-        
-        
+
+
         res.json(stats);
-        
+
     } catch (error) {
         console.error("❌ Error fetching comprehensive staff statistics:", error);
         res.status(500).json({ error: "Failed to fetch comprehensive staff statistics" });
@@ -2348,13 +2348,13 @@ app.get('/api/orders/stats/comprehensive', async (req, res) => {
 // API endpoint to get all collections data for staff (enhanced)
 app.get('/api/orders/all-collections', async (req, res) => {
     try {
-        
+
         const database = client.db(databaseName);
         const pendingCollection = database.collection("PendingOrders");
         const acceptedCollection = database.collection("AcceptedOrders");
         const deliveredCollection = database.collection("DeliveredOrders");
         const walkInCollection = database.collection("WalkInOrders");
-        
+
         // Fetch from all collections in parallel
         const [pendingOrders, acceptedOrders, deliveredOrders, walkInOrders] = await Promise.all([
             pendingCollection.find({}).toArray(),
@@ -2362,7 +2362,7 @@ app.get('/api/orders/all-collections', async (req, res) => {
             deliveredCollection.find({}).toArray(),
             walkInCollection.find({}).toArray()
         ]);
-        
+
         // Add collection and display status metadata
         const allOrders = [
             ...pendingOrders.map(order => ({
@@ -2386,17 +2386,17 @@ app.get('/api/orders/all-collections', async (req, res) => {
                 displayStatus: 'completed'
             }))
         ];
-        
+
         // Sort by most recent first
         allOrders.sort((a, b) => {
             const dateA = new Date(a.createdAt || a.orderDate || a.original_date || 0);
             const dateB = new Date(b.createdAt || b.orderDate || b.original_date || 0);
             return dateB - dateA;
         });
-        
-        
+
+
         res.json(allOrders);
-        
+
     } catch (error) {
         console.error("❌ Error fetching orders from all collections:", error);
         res.status(500).json({ error: "Failed to fetch orders from all collections" });
@@ -2409,24 +2409,24 @@ app.put('/api/orders/:orderId/status', async (req, res) => {
         const { ObjectId } = require('mongodb');
         const orderId = req.params.orderId;
         const { status, updatedBy } = req.body;
-        
-        
+
+
         if (!status) {
             return res.status(400).json({ error: "Status is required" });
         }
-        
+
         const database = client.db(databaseName);
-        
+
         // Try to find the order in all collections
         const collections = [
             { name: 'PendingOrders', collection: database.collection("PendingOrders") },
             { name: 'AcceptedOrders', collection: database.collection("AcceptedOrders") },
             { name: 'DeliveredOrders', collection: database.collection("DeliveredOrders") }
         ];
-        
+
         let order = null;
         let foundInCollection = null;
-        
+
         for (const { name, collection } of collections) {
             order = await collection.findOne({ _id: new ObjectId(orderId) });
             if (order) {
@@ -2434,36 +2434,36 @@ app.put('/api/orders/:orderId/status', async (req, res) => {
                 break;
             }
         }
-        
+
         if (!order) {
             return res.status(404).json({ error: "Order not found in any collection" });
         }
-        
-        
+
+
         // Update the order in its current collection
         const updateData = {
             status: status,
             updatedAt: new Date(),
             updatedBy: updatedBy || 'staff'
         };
-        
+
         const result = await foundInCollection.collection.updateOne(
             { _id: new ObjectId(orderId) },
             { $set: updateData }
         );
-        
+
         if (result.matchedCount === 0) {
             return res.status(404).json({ error: "Failed to update order" });
         }
-        
-        
-        res.json({ 
-            success: true, 
+
+
+        res.json({
+            success: true,
             message: `Order status updated to ${status}`,
             orderId: orderId,
             collection: foundInCollection.name
         });
-        
+
     } catch (error) {
         console.error("❌ Error updating order status:", error);
         res.status(500).json({ error: "Failed to update order status" });
@@ -2473,11 +2473,11 @@ app.put('/api/orders/:orderId/status', async (req, res) => {
 // API endpoint to get order analytics for dashboard
 app.get('/api/orders/analytics', async (req, res) => {
     try {
-        
+
         const { startDate, endDate } = req.query;
-        
+
         const database = client.db(databaseName);
-        
+
         // Build date filter if provided
         let dateFilter = {};
         if (startDate || endDate) {
@@ -2485,38 +2485,38 @@ app.get('/api/orders/analytics', async (req, res) => {
             if (startDate) dateFilter.createdAt.$gte = new Date(startDate);
             if (endDate) dateFilter.createdAt.$lte = new Date(endDate + 'T23:59:59.999Z');
         }
-        
+
         const collections = [
             { name: 'pending', collection: database.collection("PendingOrders") },
             { name: 'accepted', collection: database.collection("AcceptedOrders") },
             { name: 'delivered', collection: database.collection("DeliveredOrders") },
             { name: 'walkin', collection: database.collection("WalkInOrders") }
         ];
-        
+
         const analytics = {};
-        
+
         for (const { name, collection } of collections) {
             const count = await collection.countDocuments(dateFilter);
             const revenue = await collection.aggregate([
                 { $match: dateFilter },
                 { $group: { _id: null, total: { $sum: "$total" } } }
             ]).toArray();
-            
+
             analytics[name] = {
                 count: count,
                 revenue: revenue.length > 0 ? revenue[0].total : 0
             };
         }
-        
+
         // Calculate totals
         analytics.totals = {
             orders: Object.values(analytics).reduce((sum, item) => sum + item.count, 0),
             revenue: Object.values(analytics).reduce((sum, item) => sum + item.revenue, 0)
         };
-        
-        
+
+
         res.json(analytics);
-        
+
     } catch (error) {
         console.error("❌ Error fetching order analytics:", error);
         res.status(500).json({ error: "Failed to fetch order analytics" });
@@ -2528,14 +2528,14 @@ app.post('/api/orders/move', async (req, res) => {
     try {
         const { ObjectId } = require('mongodb');
         const { orderId, operation, fromCollection, toCollection, denialReason, returnReason, returnImage } = req.body;
-        
-        
+
+
         if (!orderId || !operation || !fromCollection || !toCollection) {
             return res.status(400).json({ error: "Missing required fields: orderId, operation, fromCollection, toCollection" });
         }
-        
+
         const database = client.db(databaseName);
-        
+
         // Map collection names to actual MongoDB collection names
         const collectionMapping = {
             'orders': 'PendingOrders',
@@ -2545,28 +2545,28 @@ app.post('/api/orders/move', async (req, res) => {
             'denied': 'DeniedOrders',
             'returned': 'ReturnedOrders'
         };
-        
+
         const sourceCollectionName = collectionMapping[fromCollection];
         const targetCollectionName = collectionMapping[toCollection];
-        
+
         if (!sourceCollectionName || !targetCollectionName) {
             return res.status(400).json({ error: "Invalid collection names" });
         }
-        
+
         const sourceCollection = database.collection(sourceCollectionName);
         const targetCollection = database.collection(targetCollectionName);
-        
+
         // Find the order in the source collection
         const order = await sourceCollection.findOne({ _id: new ObjectId(orderId) });
-        
+
         if (!order) {
             return res.status(404).json({ error: `Order not found in ${sourceCollectionName}` });
         }
-        
+
         // Prepare the order for the target collection
         let updatedOrder = { ...order };
         delete updatedOrder._id; // Remove the _id so MongoDB can assign a new one
-        
+
         // Update order based on the target status
         switch (toCollection) {
             case 'pending':
@@ -2595,45 +2595,45 @@ app.post('/api/orders/move', async (req, res) => {
                 updatedOrder.status = 'returned';
                 updatedOrder.displayStatus = 'returned';
                 updatedOrder.returnedAt = new Date();
-                
+
                 // Handle return documentation
                 if (returnReason) {
                     updatedOrder.returnReason = returnReason;
                 }
-                
+
                 if (returnImage) {
                     updatedOrder.returnImage = returnImage;
                     updatedOrder.returnImageUploadedAt = new Date();
                     console.log(`📷 Return documentation image saved (${returnImage.length} characters)`);
                 }
-                
+
                 // Add return processing metadata
                 updatedOrder.returnProcessedBy = 'staff';
                 updatedOrder.returnProcessingDate = new Date();
-                
+
                 break;
         }
-        
+
         updatedOrder.updatedAt = new Date();
         updatedOrder.lastModifiedBy = 'staff';
-        
+
         // Insert into target collection
         const insertResult = await targetCollection.insertOne(updatedOrder);
-        
+
         if (!insertResult.insertedId) {
             throw new Error('Failed to insert order into target collection');
         }
-        
+
         // Remove from source collection
         const deleteResult = await sourceCollection.deleteOne({ _id: new ObjectId(orderId) });
-        
+
         if (deleteResult.deletedCount === 0) {
             // If deletion failed, we should remove the inserted order to maintain consistency
             await targetCollection.deleteOne({ _id: insertResult.insertedId });
             throw new Error('Failed to remove order from source collection');
         }
-        
-        
+
+
         res.json({
             success: true,
             message: `Order successfully moved to ${toCollection}`,
@@ -2642,7 +2642,7 @@ app.post('/api/orders/move', async (req, res) => {
             ...(returnReason && { returnReason }),
             ...(returnImage && { returnImageSaved: true })
         });
-        
+
     } catch (error) {
         console.error("❌ Error moving order between collections:", error);
         res.status(500).json({ error: "Failed to move order between collections", details: error.message });
@@ -2654,24 +2654,24 @@ app.get('/api/orders/:orderId/return-documentation', async (req, res) => {
     try {
         const { ObjectId } = require('mongodb');
         const { orderId } = req.params;
-        
-        
+
+
         if (!orderId) {
             return res.status(400).json({ error: "Order ID is required" });
         }
-        
+
         const database = client.db(databaseName);
         const returnedOrdersCollection = database.collection("ReturnedOrders");
-        
+
         // Find the returned order
-        const returnedOrder = await returnedOrdersCollection.findOne({ 
-            _id: new ObjectId(orderId) 
+        const returnedOrder = await returnedOrdersCollection.findOne({
+            _id: new ObjectId(orderId)
         });
-        
+
         if (!returnedOrder) {
             return res.status(404).json({ error: "Returned order not found" });
         }
-        
+
         // Extract return documentation
         const returnDocumentation = {
             orderId: returnedOrder._id,
@@ -2683,10 +2683,10 @@ app.get('/api/orders/:orderId/return-documentation', async (req, res) => {
             returnProcessedBy: returnedOrder.returnProcessedBy || 'staff',
             returnImageUploadedAt: returnedOrder.returnImageUploadedAt || null
         };
-        
-        
+
+
         res.json(returnDocumentation);
-        
+
     } catch (error) {
         console.error("❌ Error fetching return documentation:", error);
         res.status(500).json({ error: "Failed to fetch return documentation", details: error.message });
@@ -3009,7 +3009,7 @@ app.post('/api/orders/cancel-request', async (req, res) => {
 app.post('/api/orders/check-cancellation-requests', async (req, res) => {
     try {
         const { orderIds } = req.body;
-        
+
         if (!orderIds || !Array.isArray(orderIds)) {
             return res.status(400).json({
                 success: false,
@@ -3195,7 +3195,7 @@ app.put('/api/orders/return-request/:requestId', async (req, res) => {
                 const userNotification = {
                     userId: userId,
                     title: isAccepted ? '↩️ Return Request Approved' : '🚫 Return Request Rejected',
-                    message: isAccepted 
+                    message: isAccepted
                         ? `Your return request for order ${orderNumber} has been approved. ${staffNotes ? `Staff notes: ${staffNotes}` : 'We will begin processing the return shortly.'}`
                         : `Your return request for order ${orderNumber} has been rejected. ${staffNotes ? `Reason: ${staffNotes}` : 'Please contact us if you would like to discuss this decision.'}`,
                     type: isAccepted ? 'order_return_approved' : 'order_return_rejected',
@@ -3366,14 +3366,14 @@ const emailTransporter = nodemailer.createTransport({
 app.post('/api/auth/send-verification', async (req, res) => {
     try {
         const { email, code, fromEmail } = req.body;
-        
+
         if (!email || !code) {
-            return res.status(400).json({ 
-                success: false, 
-                message: 'Email and verification code are required' 
+            return res.status(400).json({
+                success: false,
+                message: 'Email and verification code are required'
             });
         }
-        
+
         const mailOptions = {
             from: fromEmail || 'sanricomercantileofficial@gmail.com',
             to: email,
@@ -3404,18 +3404,18 @@ app.post('/api/auth/send-verification', async (req, res) => {
                         <div class="content">
                             <h2>Welcome to Sanrico Mercantile Inc.!</h2>
                             <p>Thank you for creating an account with us. To complete your registration, please enter the verification code below:</p>
-                            
+
                             <div class="verification-code">${code}</div>
-                            
+
                             <p>Enter this code on the verification page to activate your account.</p>
-                            
+
                             <div class="warning">
                                 <strong>Security Notice:</strong><br>
                                 • This code expires in 15 minutes<br>
                                 • Never share this code with anyone<br>
                                 • If you didn't request this, please ignore this email
                             </div>
-                            
+
                             <p>If you have any questions, please contact our support team.</p>
                         </div>
                         <div class="footer">
@@ -3427,19 +3427,19 @@ app.post('/api/auth/send-verification', async (req, res) => {
                 </html>
             `
         };
-        
+
         await emailTransporter.sendMail(mailOptions);
-        
-        res.json({ 
-            success: true, 
-            message: 'Verification email sent successfully' 
+
+        res.json({
+            success: true,
+            message: 'Verification email sent successfully'
         });
-        
+
     } catch (error) {
         console.error('Email sending error:', error);
-        res.status(500).json({ 
-            success: false, 
-            message: 'Failed to send verification email' 
+        res.status(500).json({
+            success: false,
+            message: 'Failed to send verification email'
         });
     }
 });
@@ -3448,23 +3448,23 @@ app.post('/api/auth/send-verification', async (req, res) => {
 app.post('/api/auth/create-verification-code', async (req, res) => {
     try {
         const { email, userName } = req.body;
-        
+
         if (!email) {
-            return res.status(400).json({ 
-                success: false, 
-                message: 'Email is required' 
+            return res.status(400).json({
+                success: false,
+                message: 'Email is required'
             });
         }
-        
+
         // Generate 4-digit verification code
         const verificationCode = Math.floor(1000 + Math.random() * 9000);
-        
+
         const database = client.db(databaseName);
         const authCodesCollection = database.collection("AuthCodes");
-        
+
         // Check if there's an existing code for this email
         await authCodesCollection.deleteMany({ email: email.toLowerCase() });
-        
+
         // Create new verification code entry
         const codeEntry = {
             email: email.toLowerCase(),
@@ -3476,13 +3476,13 @@ app.post('/api/auth/create-verification-code', async (req, res) => {
             attempts: 0,
             maxAttempts: 5
         };
-        
+
         const result = await authCodesCollection.insertOne(codeEntry);
-        
+
         if (result.insertedId) {
-            
-            res.json({ 
-                success: true, 
+
+            res.json({
+                success: true,
                 message: 'Verification code created successfully',
                 codeId: result.insertedId,
                 verificationCode: verificationCode // For immediate email sending
@@ -3490,12 +3490,12 @@ app.post('/api/auth/create-verification-code', async (req, res) => {
         } else {
             throw new Error('Failed to save verification code');
         }
-        
+
     } catch (error) {
         console.error('Error creating verification code:', error);
-        res.status(500).json({ 
-            success: false, 
-            message: 'Failed to create verification code' 
+        res.status(500).json({
+            success: false,
+            message: 'Failed to create verification code'
         });
     }
 });
@@ -3504,26 +3504,26 @@ app.post('/api/auth/create-verification-code', async (req, res) => {
 app.post('/api/auth/send-verification-email', async (req, res) => {
     try {
         const { email, userName, verificationCode, code } = req.body;
-        
+
         // Use either 'code' or 'verificationCode' parameter
         const finalCode = code || verificationCode;
-        
+
         if (!email || !finalCode) {
-            return res.status(400).json({ 
-                success: false, 
-                message: 'Email and verification code are required' 
+            return res.status(400).json({
+                success: false,
+                message: 'Email and verification code are required'
             });
         }
-        
+
         console.log(`📧 Sending verification email via n8n for ${email}`);
-        
+
         const emailData = {
             to: email,
             verificationCode: finalCode,
             userName: userName || '',
             type: 'verification'
         };
-        
+
         // Send email via n8n webhook
         const n8nResponse = await fetch('http://localhost:5678/webhook/send-verification-email', {
             method: 'POST',
@@ -3537,28 +3537,28 @@ app.post('/api/auth/send-verification-email', async (req, res) => {
                 type: 'verification'
             })
         });
-        
+
         if (!n8nResponse.ok) {
             console.error('❌ n8n webhook failed:', n8nResponse.status);
             throw new Error('Email service temporarily unavailable');
         }
-        
+
         const n8nResult = await n8nResponse.json();
-        
-        res.json({ 
-            success: true, 
-            message: 'Verification email sent successfully' 
+
+        res.json({
+            success: true,
+            message: 'Verification email sent successfully'
         });
-        
+
     } catch (error) {
         console.error('❌ Email sending error:', error);
-        
+
         // No fallback - force n8n only
         console.error('❌ N8N webhook failed. Error details:', error.message);
-        
-        res.status(500).json({ 
-            success: false, 
-            message: 'Email service unavailable. Please ensure n8n workflow is active and try again.' 
+
+        res.status(500).json({
+            success: false,
+            message: 'Email service unavailable. Please ensure n8n workflow is active and try again.'
         });
     }
 });
@@ -3567,54 +3567,54 @@ app.post('/api/auth/send-verification-email', async (req, res) => {
 app.post('/api/auth/verify-code', async (req, res) => {
     try {
         const { email, code } = req.body;
-        
+
         if (!email || !code) {
-            return res.status(400).json({ 
-                success: false, 
-                message: 'Email and verification code are required' 
+            return res.status(400).json({
+                success: false,
+                message: 'Email and verification code are required'
             });
         }
-        
+
         const database = client.db(databaseName);
         const authCodesCollection = database.collection("AuthCodes");
-        
+
         // Find the verification code entry
-        const codeEntry = await authCodesCollection.findOne({ 
+        const codeEntry = await authCodesCollection.findOne({
             email: email.toLowerCase(),
             used: false
         });
-        
+
         if (!codeEntry) {
-            return res.status(400).json({ 
-                success: false, 
-                message: 'No valid verification code found for this email' 
+            return res.status(400).json({
+                success: false,
+                message: 'No valid verification code found for this email'
             });
         }
-        
+
         // Check if code has expired
         if (new Date() > codeEntry.expiresAt) {
             await authCodesCollection.updateOne(
                 { _id: codeEntry._id },
                 { $set: { used: true, expiredAt: new Date() } }
             );
-            return res.status(400).json({ 
-                success: false, 
-                message: 'Verification code has expired. Please request a new one.' 
+            return res.status(400).json({
+                success: false,
+                message: 'Verification code has expired. Please request a new one.'
             });
         }
-        
+
         // Check if max attempts reached
         if (codeEntry.attempts >= codeEntry.maxAttempts) {
             await authCodesCollection.updateOne(
                 { _id: codeEntry._id },
                 { $set: { used: true, maxAttemptsReached: true } }
             );
-            return res.status(400).json({ 
-                success: false, 
-                message: 'Maximum verification attempts exceeded. Please request a new code.' 
+            return res.status(400).json({
+                success: false,
+                message: 'Maximum verification attempts exceeded. Please request a new code.'
             });
         }
-        
+
         // Verify the code
         if (String(codeEntry.verificationCode) !== String(code)) {
             // Increment attempts
@@ -3622,38 +3622,38 @@ app.post('/api/auth/verify-code', async (req, res) => {
                 { _id: codeEntry._id },
                 { $inc: { attempts: 1 } }
             );
-            
+
             const remainingAttempts = codeEntry.maxAttempts - (codeEntry.attempts + 1);
-            return res.status(400).json({ 
-                success: false, 
-                message: `Invalid verification code. ${remainingAttempts} attempts remaining.` 
+            return res.status(400).json({
+                success: false,
+                message: `Invalid verification code. ${remainingAttempts} attempts remaining.`
             });
         }
-        
+
         // Code is valid - mark as used
         await authCodesCollection.updateOne(
             { _id: codeEntry._id },
-            { 
-                $set: { 
-                    used: true, 
+            {
+                $set: {
+                    used: true,
                     verifiedAt: new Date(),
                     successful: true
-                } 
+                }
             }
         );
-        
-        
-        res.json({ 
-            success: true, 
+
+
+        res.json({
+            success: true,
             message: 'Verification code verified successfully',
             userName: codeEntry.userName
         });
-        
+
     } catch (error) {
         console.error('Error verifying code:', error);
-        res.status(500).json({ 
-            success: false, 
-            message: 'Failed to verify code' 
+        res.status(500).json({
+            success: false,
+            message: 'Failed to verify code'
         });
     }
 });
@@ -3662,28 +3662,28 @@ app.post('/api/auth/verify-code', async (req, res) => {
 app.post('/api/auth/check-email', async (req, res) => {
     try {
         const { email } = req.body;
-        
+
         if (!email) {
-            return res.status(400).json({ 
-                success: false, 
-                message: 'Email is required' 
+            return res.status(400).json({
+                success: false,
+                message: 'Email is required'
             });
         }
-        
+
         // Check if email exists in UserCredentials collection
         const db = await connectToDatabase();
         const existingUser = await db.collection('UserCredentials').findOne({ email: email.toLowerCase() });
-        
-        res.json({ 
-            success: true, 
-            exists: !!existingUser 
+
+        res.json({
+            success: true,
+            exists: !!existingUser
         });
-        
+
     } catch (error) {
         console.error('Email check error:', error);
-        res.status(500).json({ 
-            success: false, 
-            message: 'Error checking email' 
+        res.status(500).json({
+            success: false,
+            message: 'Error checking email'
         });
     }
 });
@@ -3692,45 +3692,45 @@ app.post('/api/auth/check-email', async (req, res) => {
 app.post('/api/auth/invalidate-codes', async (req, res) => {
     try {
         const { email } = req.body;
-        
+
         if (!email) {
-            return res.status(400).json({ 
-                success: false, 
-                message: 'Email is required' 
+            return res.status(400).json({
+                success: false,
+                message: 'Email is required'
             });
         }
-        
+
         const db = await connectToDatabase();
         const authCodesCollection = db.collection('AuthCodes');
-        
+
         // Mark all active codes for this email as used/invalid
         const result = await authCodesCollection.updateMany(
-            { 
+            {
                 email: email.toLowerCase(),
                 used: false,
                 expiresAt: { $gt: new Date() }
             },
-            { 
-                $set: { 
+            {
+                $set: {
                     used: true,
                     cancelledAt: new Date(),
                     cancelled: true
-                } 
+                }
             }
         );
-        
-        
-        res.json({ 
-            success: true, 
+
+
+        res.json({
+            success: true,
             message: 'All verification codes invalidated',
             invalidatedCount: result.modifiedCount
         });
-        
+
     } catch (error) {
         console.error('Error invalidating codes:', error);
-        res.status(500).json({ 
-            success: false, 
-            message: 'Error invalidating verification codes' 
+        res.status(500).json({
+            success: false,
+            message: 'Error invalidating verification codes'
         });
     }
 });
@@ -3739,11 +3739,11 @@ app.post('/api/auth/invalidate-codes', async (req, res) => {
 app.post('/api/auth/complete-registration', async (req, res) => {
     try {
         const { fullname, email, password } = req.body;
-        
+
         if (!fullname || !email || !password) {
-            return res.status(400).json({ 
-                success: false, 
-                message: 'All fields are required' 
+            return res.status(400).json({
+                success: false,
+                message: 'All fields are required'
             });
         }
         // Enforce password policy: 7–12 chars, include a digit, an uppercase, and one of . or !
@@ -3754,21 +3754,21 @@ app.post('/api/auth/complete-registration', async (req, res) => {
                 message: 'Password must be 7–12 chars and include a number, an uppercase letter, and one of . or !'
             });
         }
-        
+
         const db = await connectToDatabase();
-        
+
         // Check if user already exists in UserCredentials collection
         const existingUser = await db.collection('UserCredentials').findOne({ email: email.toLowerCase() });
         if (existingUser) {
-            return res.status(400).json({ 
-                success: false, 
-                message: 'User with this email already exists' 
+            return res.status(400).json({
+                success: false,
+                message: 'User with this email already exists'
             });
         }
-        
+
         // Hash password for security
         const hashedPassword = await bcrypt.hash(password, 12);
-        
+
         // Create user credentials object for UserCredentials collection
         const userCredentials = {
             fullName: fullname,
@@ -3780,15 +3780,15 @@ app.post('/api/auth/complete-registration', async (req, res) => {
             status: 'active',
             verificationCompletedAt: new Date()
         };
-        
+
         // Save to UserCredentials collection (only after successful verification)
         const result = await db.collection('UserCredentials').insertOne(userCredentials);
-        
+
         if (result.insertedId) {
             // Generate JWT token
             const token = jwt.sign(
-                { 
-                    userId: result.insertedId, 
+                {
+                    userId: result.insertedId,
                     email: userCredentials.email,
                     fullName: userCredentials.fullName,
                     verified: true
@@ -3796,9 +3796,9 @@ app.post('/api/auth/complete-registration', async (req, res) => {
                 process.env.JWT_SECRET || 'your-secret-key',
                 { expiresIn: '7d' }
             );
-            
+
             // Log successful registration
-            
+
             // Return success response
             res.status(201).json({
                 success: true,
@@ -3816,12 +3816,12 @@ app.post('/api/auth/complete-registration', async (req, res) => {
         } else {
             throw new Error('Failed to save user credentials');
         }
-        
+
     } catch (error) {
         console.error('❌ Registration completion error:', error);
-        res.status(500).json({ 
-            success: false, 
-            message: 'Failed to complete registration' 
+        res.status(500).json({
+            success: false,
+            message: 'Failed to complete registration'
         });
     }
 });
@@ -3830,107 +3830,107 @@ app.post('/api/auth/complete-registration', async (req, res) => {
 app.post('/api/auth/login', async (req, res) => {
     try {
         const { email, password } = req.body;
-        
+
         // Input validation and sanitization
         if (!email || !password) {
-            return res.status(400).json({ 
-                success: false, 
-                message: 'Email and password are required' 
+            return res.status(400).json({
+                success: false,
+                message: 'Email and password are required'
             });
         }
-        
+
         // Sanitize inputs
         const sanitizedEmail = String(email).trim().toLowerCase();
         const sanitizedPassword = String(password).trim();
-        
+
         // Validate email format
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (!emailRegex.test(sanitizedEmail)) {
-            return res.status(400).json({ 
-                success: false, 
-                message: 'Invalid email format' 
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid email format'
             });
         }
-        
+
         // Validate password length
         if (sanitizedPassword.length < 6 || sanitizedPassword.length > 128) {
-            return res.status(400).json({ 
-                success: false, 
-                message: 'Invalid password format' 
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid password format'
             });
         }
-        
+
         const db = await connectToDatabase();
-        
+
         // Find user in UserCredentials collection
-        const user = await db.collection('UserCredentials').findOne({ 
-            email: sanitizedEmail 
+        const user = await db.collection('UserCredentials').findOne({
+            email: sanitizedEmail
         });
-        
+
         if (!user) {
-            return res.status(401).json({ 
-                success: false, 
-                message: 'Invalid email or password' 
+            return res.status(401).json({
+                success: false,
+                message: 'Invalid email or password'
             });
         }
-        
+
         // Check if account is active
         if (user.status !== 'active') {
-            return res.status(401).json({ 
-                success: false, 
-                message: 'Account is not active' 
+            return res.status(401).json({
+                success: false,
+                message: 'Account is not active'
             });
         }
-        
+
         // Verify password
         const passwordMatch = await bcrypt.compare(sanitizedPassword, user.password);
-        
+
         if (!passwordMatch) {
-            return res.status(401).json({ 
-                success: false, 
-                message: 'Invalid email or password' 
+            return res.status(401).json({
+                success: false,
+                message: 'Invalid email or password'
             });
         }
-        
+
         // Check if email is verified
         if (!user.emailVerified) {
-            return res.status(401).json({ 
-                success: false, 
-                message: 'Please verify your email before logging in' 
+            return res.status(401).json({
+                success: false,
+                message: 'Please verify your email before logging in'
             });
         }
-        
+
         // Update last login time
         await db.collection('UserCredentials').updateOne(
             { _id: user._id },
-            { 
-                $set: { 
+            {
+                $set: {
                     lastLogin: new Date(),
                     lastUpdated: new Date()
                 }
             }
         );
-        
+
         // Generate JWT token with strong secret
         const jwtSecret = process.env.JWT_SECRET || 'your-super-secure-jwt-secret-key-here-change-this-in-production-123456789012345678901234567890';
         const token = jwt.sign(
-            { 
-                userId: user._id, 
+            {
+                userId: user._id,
                 email: user.email,
                 fullName: user.fullName,
                 verified: user.emailVerified,
                 iat: Math.floor(Date.now() / 1000)
             },
             jwtSecret,
-            { 
+            {
                 expiresIn: '7d',
                 issuer: 'sanrico-mercantile',
                 audience: 'sanrico-users'
             }
         );
-        
+
         // Log successful login
-        
+
         // Return success response (don't include password)
         res.json({
             success: true,
@@ -3946,12 +3946,12 @@ app.post('/api/auth/login', async (req, res) => {
                 status: user.status
             }
         });
-        
+
     } catch (error) {
         console.error('❌ Login error:', error);
-        res.status(500).json({ 
-            success: false, 
-            message: 'Login failed. Please try again.' 
+        res.status(500).json({
+            success: false,
+            message: 'Login failed. Please try again.'
         });
     }
 });

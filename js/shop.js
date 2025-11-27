@@ -78,7 +78,7 @@ function getCacheKey(category, sortBy, searchQuery) {
 // Load a single page from API
 async function fetchPageFromAPI(page, category, sortBy, searchQuery) {
     const skip = (page - 1) * productsPerPage;
-    let apiUrl = `http://localhost:3000/api/products?limit=${productsPerPage}&skip=${skip}&includeMeta=true`;
+    let apiUrl = `/api/products?limit=${productsPerPage}&skip=${skip}&includeMeta=true`;
     
     // Add category filter if not 'all'
     if (category && category !== 'all') {
@@ -309,7 +309,7 @@ async function preloadPages(pages, category, sortBy, searchQuery) {
 async function loadCategories() {
     try {
         // Fetch a small sample to get categories, or use a dedicated endpoint
-        const response = await fetch('http://localhost:3000/api/products?limit=1000');
+        const response = await fetch('/api/products?limit=1000');
         if (response.ok) {
             const allProducts = await response.json();
             allCategories = [...new Set(allProducts.map(p => p.category).filter(c => c))];
@@ -830,4 +830,3 @@ function switchMode(mode) {
 // Multi-mode actions removed - drag and drop only
 
 // Multi-mode cart functions removed - drag and drop only
-

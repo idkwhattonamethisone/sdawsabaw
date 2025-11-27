@@ -146,7 +146,7 @@
             if (event.data.info && event.data.info.playerState === 0) { // Video ended
               var iframe = document.querySelector('.carousel-video');
               if (iframe && iframe.contentWindow) {
-                try { 
+                try {
                   iframe.contentWindow.postMessage('{"event":"command","func":"seekTo","args":"0","id":"0"}', '*');
                   iframe.contentWindow.postMessage('{"event":"command","func":"playVideo","args":""}', '*');
                 } catch(e) {}
@@ -159,11 +159,11 @@
         window.addEventListener('load', function(){ setTimeout(runBrandAnimation, 50); }, { once: true });
       })();
     </script>
-    
+
     <script src="js/shop.js"></script>
     <script src="js/stockDisplay.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/2.0.2/anime.min.js"></script>
-    
+
     <style>
         .search-container {
             position: relative;
@@ -296,7 +296,7 @@
         .featured-loading-skeleton.hidden {
             display: none !important;
         }
-        
+
         .category-loading-skeleton:not(.hidden),
         .featured-loading-skeleton:not(.hidden) {
             display: block;
@@ -579,7 +579,7 @@
             .featured .product-card { height: 200px; }
             .featured .product-img { height: 100px; flex-basis: 100px; }
         }
-        
+
         /* Carousel products grid: fixed card sizes and responsive wrapping */
         .category-carousel { width: 100%; }
         .carousel-products { display: none; }
@@ -590,7 +590,7 @@
             gap: 16px;
             align-items: stretch;
         }
-        
+
         @media (max-width: 1024px) {
             .category-card { width: 220px; }
             .category-card,
@@ -854,7 +854,7 @@
                 <a href="index.html" class="active">Home</a>
                 <a href="shop.html">Shop</a>
                 <a href="aboutus.html">About Us</a>
-                
+
 
                 <!-- Information Dropdown Menu -->
                 <div class="nav-dropdown">
@@ -947,15 +947,15 @@
         <div class="modal-content">
             <button class="modal-close" id="modalClose">×</button>
             <h2 class="modal-title">Welcome Back</h2>
-            
+
             <!-- Login Mode Tabs -->
             <div class="tab-buttons" id="loginTabs">
                 <button class="tab-btn active" data-tab="user-login">User Login</button>
                 <button class="tab-btn" data-tab="staff-login">Staff Login</button>
             </div>
-            
+
             <div class="tab-container">
-                
+
                 <!-- User Login Tab -->
                 <div class="tab-content active" id="user-login">
                     <div class="form-group">
@@ -967,35 +967,35 @@
                         <input type="password" id="user-password" class="form-control" placeholder="Enter your password">
                     </div>
                     <button class="btn" id="userLoginSubmitBtn">Sign In</button>
-                    
+
                     <div class="signup-prompt" style="text-align: center; margin: 16px 0;">
                         <span style="color: #7f8c8d; font-size: 14px;">Don't have an account? </span>
                         <button type="button" class="signup-link" onclick="showRegistrationModal()" style="background: none; border: none; color: #3498db; font-size: 14px; font-weight: 600; cursor: pointer; padding: 0; text-decoration: underline;">Create one today</button>
                     </div>
-                    
+
                     <div class="login-separator">
                         <div></div>
                         <span>or continue with</span>
                         <div></div>
                     </div>
-                    
+
                     <div class="google-signin-container">
                         <div id="g_id_onload"
                              data-client_id="856316440062-00drlhn0s99moqu4a0ktbvgrk0l4mda2.apps.googleusercontent.com"
                              data-callback="handleGoogleSignIn"
                              data-auto_prompt="false">
                         </div>
-                        <div class="g_id_signin" 
-                             data-type="standard" 
-                             data-size="large" 
-                             data-theme="outline" 
-                             data-text="sign_in_with" 
-                             data-shape="rectangular" 
+                        <div class="g_id_signin"
+                             data-type="standard"
+                             data-size="large"
+                             data-theme="outline"
+                             data-text="sign_in_with"
+                             data-shape="rectangular"
                              data-logo_alignment="left"
                              title="Sign in/Sign up using a Google account">
                         </div>
                     </div>
-                    
+
                     <div class="forgot-password-prompt" style="text-align: center; margin: 16px 0 0 0;">
                         <span style="color: #7f8c8d; font-size: 14px;">Forgot your password? </span>
                         <button type="button" class="forgot-password-link" onclick="showRegistrationModal('forgot-password')" style="background: none; border: none; color: #3498db; font-size: 14px; font-weight: 600; cursor: pointer; padding: 0; text-decoration: underline;">Retrieve it today</button>
@@ -1013,7 +1013,7 @@
                         <input type="password" id="staff-password" class="form-control" placeholder="Enter your password">
                     </div>
                     <button class="btn" id="staffLoginSubmitBtn">Staff Sign In</button>
-                    
+
                     <div class="staff-login-note" style="text-align: center; margin-top: 16px; color: #7f8c8d; font-size: 14px;">
                         Staff credentials only. No social login available.
                     </div>
@@ -1027,15 +1027,15 @@
         <div class="modal-content">
             <button class="modal-close" id="registrationModalClose">×</button>
             <h2 class="modal-title">Create Account</h2>
-            
+
             <!-- Registration Mode Tabs -->
             <div class="tab-buttons" id="registrationTabs">
                 <button class="tab-btn active" data-tab="user-signup">Register</button>
                 <button class="tab-btn" data-tab="forgot-password">Account Recovery</button>
             </div>
-            
+
             <div class="tab-container">
-                
+
                 <!-- User Signup Tab -->
                 <div class="tab-content active" id="user-signup">
                     <div class="form-group">
@@ -1070,30 +1070,30 @@
                         <div class="success-message"></div>
                     </div>
                     <button class="btn" id="userSignupSubmitBtn">Create My Account</button>
-                    
+
                     <div class="signup-prompt" style="text-align: center; margin: 16px 0;">
                         <span style="color: #7f8c8d; font-size: 14px;">Already have an account? </span>
                         <button type="button" class="login-link" onclick="showLoginModal()" style="background: none; border: none; color: #3498db; font-size: 14px; font-weight: 600; cursor: pointer; padding: 0; text-decoration: underline;">Sign in here</button>
                     </div>
-                    
+
                     <div class="login-separator">
                         <div></div>
                         <span>or continue with</span>
                         <div></div>
                     </div>
-                    
+
                     <div class="google-signin-container">
                         <div id="g_id_onload"
                              data-client_id="856316440062-00drlhn0s99moqu4a0ktbvgrk0l4mda2.apps.googleusercontent.com"
                              data-callback="handleGoogleSignIn"
                              data-auto_prompt="false">
                         </div>
-                        <div class="g_id_signin" 
-                             data-type="standard" 
-                             data-size="large" 
-                             data-theme="outline" 
-                             data-text="sign_up_with" 
-                             data-shape="rectangular" 
+                        <div class="g_id_signin"
+                             data-type="standard"
+                             data-size="large"
+                             data-theme="outline"
+                             data-text="sign_up_with"
+                             data-shape="rectangular"
                              data-logo_alignment="left"
                              title="Sign up using a Google account">
                         </div>
@@ -1109,7 +1109,7 @@
                         <div class="success-message"></div>
                     </div>
                     <button class="btn" id="forgotPasswordSubmitBtn">Send Recovery Email</button>
-                    
+
                     <div class="signup-prompt" style="text-align: center; margin: 16px 0;">
                         <span style="color: #7f8c8d; font-size: 14px;">Remember your password? </span>
                         <button type="button" class="login-link" onclick="showLoginModal()" style="background: none; border: none; color: #3498db; font-size: 14px; font-weight: 600; cursor: pointer; padding: 0; text-decoration: underline;">Sign in here</button>
@@ -1200,12 +1200,12 @@
         // Fetch 45 products (optimized from 60) - enough buffer after stock filtering
         // Use skipSort=true to skip expensive sorting for faster loading
         const INDEX_PRODUCTS_LIMIT = 45;
-        
+
         // Create a separate limited promise for index page display
         // headerSearch.js will still use window.productsPromise for full search functionality
         // Use skipSort=true to skip sorting for much faster loading (we'll sort client-side if needed)
         // Use minimal=true to only fetch essential fields (dramatically reduces data size)
-        const indexProductsPromise = fetch(`http://localhost:3000/api/products?limit=${INDEX_PRODUCTS_LIMIT}&skipSort=true&minimal=true`).then(response => {
+        const indexProductsPromise = fetch(`/api/products?limit=${INDEX_PRODUCTS_LIMIT}&skipSort=true&minimal=true`).then(response => {
             if (!response.ok) throw new Error('Failed to fetch products');
             return response.json();
         }).catch(error => {
@@ -1221,13 +1221,13 @@
                 const featuredSkeleton = document.getElementById('featuredLoadingSkeleton');
                 if (categorySkeleton) categorySkeleton.classList.remove('hidden');
                 if (featuredSkeleton) featuredSkeleton.classList.remove('hidden');
-                
+
                 // Try to redirect staff again (in case auth state changes)
                 if (Auth.redirectIfStaff()) return;
-                
+
                 // Update cart count
                 Auth.updateCartCount();
-                
+
                 // Update login/signup buttons based on auth state
                 const currentUser = Auth.getCurrentUser();
                 if (currentUser) {
@@ -1247,10 +1247,10 @@
                         });
                     }
                 }
-                
+
                 // Wait for limited products (already started above)
                 let products = await indexProductsPromise;
-                
+
                 // Optimized: Process products in a single pass for better performance
                 // Convert price and filter stock in one map operation
                 const toNumber = (val) => {
@@ -1258,15 +1258,15 @@
                     if (typeof val === 'object' && val.$numberDecimal !== undefined) return parseFloat(val.$numberDecimal);
                     return parseFloat(val);
                 };
-                
+
                 // Single pass: convert price and filter stock simultaneously
                 products = products
                     .map(product => {
                         // Fast price extraction - check most common fields first
-                        const price = toNumber(product.SellingPrice) || 
-                                     toNumber(product.sellingPrice) || 
-                                     toNumber(product.Price) || 
-                                     toNumber(product.price) || 
+                        const price = toNumber(product.SellingPrice) ||
+                                     toNumber(product.sellingPrice) ||
+                                     toNumber(product.Price) ||
+                                     toNumber(product.price) ||
                                      NaN;
                         return { ...product, price };
                     })
@@ -1280,28 +1280,28 @@
                     ['plumbing', 'plumbing-fixtures'],
                     ['electrical', 'electrical-supplies']
                 ]);
-                
+
                 const normalizeCategory = (raw) => {
                     if (!raw) return 'other';
                     const val = String(raw).toLowerCase();
-                    
+
                     // Check exact matches first (fastest)
                     if (categoryMap.has(val)) return categoryMap.get(val);
-                    
+
                     // Then check includes (slower, but needed for variations)
                     if (val.includes('paint')) return 'paints';
                     if (val.includes('tool') || val.includes('accessor')) return 'tools-accessories';
-                    if (val.includes('building') || val.includes('aggregate') || val.includes('cement') || 
-                        val.includes('sand') || val.includes('gravel') || val.includes('wood') || 
+                    if (val.includes('building') || val.includes('aggregate') || val.includes('cement') ||
+                        val.includes('sand') || val.includes('gravel') || val.includes('wood') ||
                         val.includes('lumber') || val.includes('tile') || val.includes('roof')) return 'building-materials-aggregates';
-                    if (val.includes('electrical') || val.includes('wire') || val.includes('breaker') || 
+                    if (val.includes('electrical') || val.includes('wire') || val.includes('breaker') ||
                         val.includes('outlet') || val.includes('switch')) return 'electrical-supplies';
-                    if (val.includes('plumbing') || val.includes('fixture') || val.includes('pipe') || 
+                    if (val.includes('plumbing') || val.includes('fixture') || val.includes('pipe') ||
                         val.includes('fitting') || val.includes('faucet') || val.includes('valve')) return 'plumbing-fixtures';
-                    if (val.includes('fastener') || val.includes('screw') || val.includes('nail') || 
-                        val.includes('bolt') || val.includes('nut') || val.includes('adhesive') || 
+                    if (val.includes('fastener') || val.includes('screw') || val.includes('nail') ||
+                        val.includes('bolt') || val.includes('nut') || val.includes('adhesive') ||
                         val.includes('sealant') || val.includes('tape')) return 'fasteners-consumables';
-                    
+
                     return 'other';
                 };
 
@@ -1328,7 +1328,7 @@
                 // Hide loading skeletons
                 if (categorySkeleton) categorySkeleton.classList.add('hidden');
                 if (featuredSkeleton) featuredSkeleton.classList.add('hidden');
-                
+
                 // Create category carousels
                 const categoryCarousel = document.querySelector('.category-carousel');
                 const orderedEntries = desiredOrder
@@ -1350,8 +1350,8 @@
                                 <div class="category-card" data-stock-quantity="${product.stockQuantity}">
                                     <a href="product.html?id=${product._id}" class="category-link">
                                         <div class="category-img">
-                                            <img src="${product.image || 'images/sanrico_logo_1.png'}" 
-                                                 alt="${product.name}" 
+                                            <img src="${product.image || 'images/sanrico_logo_1.png'}"
+                                                 alt="${product.name}"
                                                  style="width: 100%; height: 100%; object-fit: cover;">
                                             <div class="category-img-overlay">
                                         <span class="product-price">₱${product.price.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
@@ -1361,7 +1361,7 @@
                                             <h3 class="category-title">${truncateName(product.name)}</h3>
                                         </div>
                                     </a>
-                                    
+
                                     <!-- Stock outside the category link -->
                                     <div class="category-details">
                                         <div class="category-stock">
@@ -1465,7 +1465,7 @@
             } catch (error) {
                 console.error('Error during initial load:', error);
                 showToast('Failed to load products', 'error');
-                
+
                 // Hide loading skeletons on error
                 const categorySkeleton = document.getElementById('categoryLoadingSkeleton');
                 const featuredSkeleton = document.getElementById('featuredLoadingSkeleton');
@@ -1502,7 +1502,7 @@
 
         // Scroll to Top functionality
         const scrollToTopBtn = document.getElementById('scrollToTop');
-        
+
         window.addEventListener('scroll', () => {
             if (window.pageYOffset > 300) {
                 scrollToTopBtn.classList.add('visible');
@@ -1669,7 +1669,7 @@
                 setTimeout(function(){ addRevealTargets(); initObserver(); }, 150);
             });
         })();
-        
+
         document.addEventListener('DOMContentLoaded', function() {
             const sidebar = document.getElementById('retractableSidebar');
             const sidebarToggle = document.getElementById('sidebarToggle');

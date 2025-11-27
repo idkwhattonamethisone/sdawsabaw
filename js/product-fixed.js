@@ -12,7 +12,7 @@ function formatPHPPrice(price) {
     
     if (productIdParam) {
         // Start fetch immediately, don't wait for DOMContentLoaded
-        window.productDetailsPromise = fetch(`http://localhost:3000/api/products/${productIdParam}`).then(response => {
+        window.productDetailsPromise = fetch(`/api/products/${productIdParam}`).then(response => {
             if (!response.ok) throw new Error('Failed to fetch product');
             return response.json();
         }).catch(error => {
@@ -133,7 +133,7 @@ async function loadProductDetails() {
     }
 
     try {
-        const response = await fetch(`http://localhost:3000/api/products/${productId}`);
+        const response = await fetch(`/api/products/${productId}`);
         
         if (!response.ok) {
             if (response.status === 404) {
@@ -348,7 +348,7 @@ async function addToCart() {
             return;
         }
 
-        const response = await fetch(`http://localhost:3000/api/products/${window.currentProduct.id}`);
+        const response = await fetch(`/api/products/${window.currentProduct.id}`);
         const productData = await response.json();
         
         if (productData.stock < quantity) {
@@ -646,7 +646,7 @@ async function loadRelatedProducts(currentProductId, category) {
     }
 
     try {
-        const response = await fetch('http://localhost:3000/api/products');
+        const response = await fetch('/api/products');
         if (!response.ok) {
             throw new Error('Failed to fetch products');
         }
